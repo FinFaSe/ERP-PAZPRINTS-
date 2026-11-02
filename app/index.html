@@ -132,7 +132,7 @@ const ESTADOS = [
 const METODOS = ['Efectivo','Yape','Plin','Transferencia','Tarjeta'];
 const defaultConfig = () => ({
   empresa:'PazPrints', ruc:'', telefono:'', direccion:'',
-  aplicarIGV:false, igv:18, adelantoPct:50
+  aplicarIGV:false, igv:18
 });
 let db;
 function load(){
@@ -291,7 +291,7 @@ function msgCotizacion(q){
   L.push('');
   if(cf.aplicarIGV) L.push(`Subtotal: ${money(t.sub)}`, `IGV (${cf.igv}%): ${money(t.igv)}`);
   L.push(`*Total: ${money(t.total)}* (servicio completo)`);
-  L.push(`Adelanto para empezar (${cf.adelantoPct}%): ${money(t.total*cf.adelantoPct/100)}`);
+  if(+q.adelanto>0) L.push(`Adelanto: ${money(q.adelanto)}`, `Saldo: ${money(Math.max(0,t.total-q.adelanto))}`);
   if(q.fechaInicio) L.push(`Fecha de inicio: ${fmtDate(q.fechaInicio)}`);
   if(q.fechaEntrega) L.push(`Fecha de entrega: ${fmtDate(q.fechaEntrega)}`);
   if(q.notas) L.push('', q.notas);
@@ -331,7 +331,7 @@ function cotizaciones(){
   <td class="n" style="white-space:nowrap"><button class="sm" onclick="editCotizacion('${q.id}')">Abrir</button> <button class="sm wa" title="Enviar por WhatsApp" onclick="waCotizacion('${q.id}')">📲</button> <button class="sm" title="Imprimir / PDF" onclick="imprimirCot('${q.id}')">🖨</button> <button class="sm danger" title="Eliminar" onclick="delCot('${q.id}')">🗑</button></td></tr>`}).join('')}</table>`:'<div class="empty">Aún no hay cotizaciones. Presiona <b>+ Nueva cotización</b> para empezar.</div>'}</div>`;
 }
 function nuevaCotizacion(clienteId){
-  window._cot = {id:null, numero:'', fecha:today(), fechaInicio:today(), fechaEntrega:addDays(today(),5), clienteId: clienteId||(db.clientes[0]?db.clientes[0].id:''), items:[nuevoItem()], estado:'borrador', notas:'',
+  window._cot = {id:null, numero:'', fecha:today(), fechaInicio:today(), fechaEntrega:addDays(today(),5), clienteId: clienteId||(db.clientes[0]?db.clientes[0].id:''), items:[nuevoItem()], estado:'borrador', notas:'', adelanto:'', metodoAdelanto:'Efectivo',
                  _nuevo: !db.clientes.length, _nc:{nombre:'',telefono:''}};
   formCotizacion();
 }
@@ -340,9 +340,14 @@ function editCotizacion(id){ window._cot = Object.assign(JSON.parse(JSON.stringi
 function totalsHTML(items){
   const t = calcDoc(items), cf = db.config;
   return `${cf.aplicarIGV?`<div><span>Subtotal</span><span>${money(t.sub)}</span></div><div><span>IGV (${cf.igv}%)</span><span>${money(t.igv)}</span></div>`:''}
-    <div class="t"><span>Total (${t.qty} ${plural(t.qty,'prenda','prendas')})</span><span>${money(t.total)}</span></div>
-    <div class="muted"><span>Adelanto (${cf.adelantoPct}%)</span><span>${money(t.total*cf.adelantoPct/100)}</span></div>`;
+    <div class="t"><span>Total (${t.qty} ${plural(t.qty,'prenda','prendas')})</span><span>${money(t.total)}</span></div>`;
 }
+// Saldo: en cotización = total − adelanto escrito; al editar un pedido = total − pagos registrados
+function saldoActual(){
+  const q = window._cot, t = calcDoc(q.items).total;
+  return Math.max(0, t - (q._modo==='pedido' ? pagado(q.id) : (+q.adelanto||0)));
+}
+const rerender = () => window._cot._modo==='pedido' ? formEditPedido() : formCotizacion();
 function filaItem(it,i,ro,prendas,unica){
   const dis = ro?'disabled':'';
   return `<tr>
@@ -351,7 +356,7 @@ function filaItem(it,i,ro,prendas,unica){
     <td><input type="number" min="1" style="width:90px" placeholder="0" value="${it.cantidad}" ${dis} oninput="setIt(${i},'cantidad',this.value)"></td>
     <td><input type="number" min="0" step="0.1" style="width:110px" placeholder="0.00" value="${it.precio}" ${dis} oninput="setIt(${i},'precio',this.value)"></td>
     <td class="n" id="ci-tt-${i}"><b>${money(calcItem(it).total)}</b></td>
-    <td>${ro||unica?'':`<button class="sm danger" title="Quitar" onclick="window._cot.items.splice(${i},1);formCotizacion()">✕</button>`}</td></tr>`;
+    <td>${ro||unica?'':`<button class="sm danger" title="Quitar" onclick="window._cot.items.splice(${i},1);rerender()">✕</button>`}</td></tr>`;
 }
 function formCotizacion(){
   const q = window._cot, ro = !!q.pedidoId, dis = ro?'disabled':'';
@@ -378,8 +383,14 @@ function formCotizacion(){
   ${q.items.map((it,i)=>filaItem(it,i,ro,prendas,q.items.length<2)).join('')}</table></div>
   ${ro?'':`<button class="sm" style="margin-top:8px" onclick="window._cot.items.push(nuevoItem());formCotizacion()">+ Agregar otro servicio</button>`}
   <p class="muted" style="font-size:12px">El precio por unidad incluye todo el servicio (prenda, estampado, pantallas, etc.).</p>
-  <h2 class="paso"><span>3</span> Total y notas</h2>
+  <h2 class="paso"><span>3</span> Total, adelanto y notas</h2>
   <div class="totals" id="cotTotals">${totalsHTML(q.items)}</div>
+  <div class="form" style="margin-top:14px">
+    <div><label>Adelanto que deja el cliente S/ (opcional)</label><input type="number" min="0" step="0.1" placeholder="0.00" value="${q.adelanto??''}" ${dis} oninput="window._cot.adelanto=this.value;refreshCot()"></div>
+    <div><label>Método de pago del adelanto</label><select ${dis} onchange="window._cot.metodoAdelanto=this.value">${METODOS.map(m=>`<option ${m===(q.metodoAdelanto||'Efectivo')?'selected':''}>${m}</option>`).join('')}</select></div>
+    <div><label>Saldo pendiente</label><div id="cotSaldo" style="padding-top:8px;font-weight:700">${money(saldoActual())}</div></div>
+  </div>
+  <p class="muted" style="font-size:12px">Si el cliente no deja adelanto, déjalo vacío. El adelanto se registra en Caja cuando se crea el pedido.</p>
   <label style="margin-top:10px">Notas para el cliente (aparecen en el mensaje y en la impresión)</label><textarea ${dis} oninput="window._cot.notas=this.value" placeholder="Ej.: Diseño enviado por el cliente, tallas S a XL">${esc(q.notas)}</textarea>`,
   ro ? `<button class="danger" style="margin-right:auto" onclick="delCot('${q.id}')">🗑 Eliminar</button><button onclick="closeDlg()">Cerrar</button><button onclick="imprimirCot('${q.id}')">🖨 Imprimir</button><button class="wa" onclick="waCotizacion('${q.id}')">📲 Reenviar por WhatsApp</button>`
      : `${q.id?`<button class="danger" style="margin-right:auto" onclick="delCot('${q.id}')">🗑 Eliminar</button>`:''}<button onclick="closeDlg()">Cancelar</button><button onclick="saveCot()">💾 Guardar borrador</button><button class="wa" onclick="if(saveCot(true)) waCotizacion(window._cot.id)">📲 Guardar y enviar por WhatsApp</button><button class="primary" onclick="aPedido()">✔ El cliente aceptó: crear pedido</button>`);
@@ -390,20 +401,26 @@ function refreshCot(){
   if(!$('#cotTotals')) return;
   window._cot.items.forEach((it,i)=>{ const e=document.getElementById('ci-tt-'+i); if(e) e.innerHTML=`<b>${money(calcItem(it).total)}</b>`; });
   $('#cotTotals').innerHTML = totalsHTML(window._cot.items);
+  const s=$('#cotSaldo'); if(s) s.textContent = money(saldoActual());
 }
-function setPrenda(i,pid){ const it=window._cot.items[i]; it.prendaId=pid; const p=byId(db.inventario,pid); if(p && !String(it.descripcion).trim()) it.descripcion=nombreInv(p); formCotizacion(); }
+function setPrenda(i,pid){ const it=window._cot.items[i]; it.prendaId=pid; const p=byId(db.inventario,pid); if(p && !String(it.descripcion).trim()) it.descripcion=nombreInv(p); rerender(); }
 function validarCot(){
   const q = window._cot;
-  if(q._nuevo){
-    if(!q._nc.nombre.trim()){ toast('Escribe el nombre del cliente (paso 1)'); return false; }
+  if(q._nuevo && !q._nc.nombre.trim()){ toast('Escribe el nombre del cliente (paso 1)'); return false; }
+  if(!q._nuevo && !byId(db.clientes,q.clienteId) && !db.clientesEliminados[q.clienteId]){ toast('Elige un cliente (paso 1)'); return false; }
+  if(q.fechaInicio && q.fechaEntrega && q.fechaEntrega < q.fechaInicio){ toast('La fecha de entrega no puede ser antes de la fecha de inicio'); return false; }
+  if(!validarItems(q.items)) return false;
+  if(q.adelanto!=='' && q.adelanto!=null && (+q.adelanto<0 || +q.adelanto > calcDoc(q.items).total+0.009)){ toast('El adelanto no puede ser mayor que el total (paso 3)'); return false; }
+  if(q._nuevo){   // el cliente nuevo se crea solo cuando todo está correcto
     const c = {id:uid(), nombre:q._nc.nombre.trim(), doc:'', telefono:q._nc.telefono.trim(), email:'', direccion:'', notas:'', creado:today()};
     db.clientes.push(c); q.clienteId=c.id; q._nuevo=false;
   }
-  if(!byId(db.clientes,q.clienteId) && !db.clientesEliminados[q.clienteId]){ toast('Elige un cliente (paso 1)'); return false; }
-  if(q.fechaInicio && q.fechaEntrega && q.fechaEntrega < q.fechaInicio){ toast('La fecha de entrega no puede ser antes de la fecha de inicio'); return false; }
-  if(!q.items.length || q.items.some(it=>!(+it.cantidad>0))){ toast('Revisa las cantidades (paso 2)'); return false; }
-  if(q.items.some(it=>!String(it.descripcion).trim())){ toast('Falta la descripción de algún servicio (paso 2)'); return false; }
-  if(q.items.some(it=>!(+it.precio>0))){ toast('Falta el precio de algún servicio (paso 2)'); return false; }
+  return true;
+}
+function validarItems(items){
+  if(!items.length || items.some(it=>!(+it.cantidad>0))){ toast('Revisa las cantidades de los servicios'); return false; }
+  if(items.some(it=>!String(it.descripcion).trim())){ toast('Falta la descripción de algún servicio'); return false; }
+  if(items.some(it=>!(+it.precio>0))){ toast('Falta el precio de algún servicio'); return false; }
   return true;
 }
 function saveCot(silent){
@@ -437,8 +454,10 @@ function aPedido(){
   db.seq.ped++;
   const p = {id:uid(), numero:'PED-'+String(db.seq.ped).padStart(4,'0'), cotizacionId:q.id, clienteId:q.clienteId, fecha:today(), fechaInicio:q.fechaInicio||today(), fechaEntrega:q.fechaEntrega||addDays(today(),5),
     items:JSON.parse(JSON.stringify(q.items)), total:q.total, estado:'pendiente', notas:q.notas||'', stockDescontado:false, historial:[{fecha:today(),estado:'pendiente'}]};
-  db.pedidos.push(p); q.pedidoId=p.id; save(); closeDlg();
-  toast('Pedido '+p.numero+' creado. Si ya pagó el adelanto, regístralo.');
+  db.pedidos.push(p); q.pedidoId=p.id;
+  if(+q.adelanto>0) db.movimientos.push({id:uid(), tipo:'ingreso', pedidoId:p.id, fecha:today(), monto:+q.adelanto, metodo:q.metodoAdelanto||'Efectivo', concepto:'Adelanto '+p.numero, categoria:'Venta'});
+  save(); closeDlg();
+  toast('Pedido '+p.numero+' creado' + (+q.adelanto>0 ? ' con adelanto de '+money(q.adelanto) : ' sin adelanto'));
   location.hash='pedidos'; setTimeout(()=>verPedido(p.id),50);
 }
 function imprimirCot(id){
@@ -450,7 +469,7 @@ function imprimirCot(id){
   <table><tr><th>Descripción del servicio</th><th class="n">Cant.</th><th class="n">P. unit.</th><th class="n">Total</th></tr>
   ${q.items.map(it=>`<tr><td>${esc(it.descripcion)}</td><td class="n">${it.cantidad}</td><td class="n">${money(it.precio)}</td><td class="n">${money(calcItem(it).total)}</td></tr>`).join('')}</table>
   <p class="n">${cf.aplicarIGV?`Subtotal: ${money(t.sub)}<br>IGV ${cf.igv}%: ${money(t.igv)}<br>`:''}<b style="font-size:18px">Total: ${money(t.total)}</b></p>
-  <p>Adelanto requerido: ${cf.adelantoPct}% (${money(t.total*cf.adelantoPct/100)})</p>${q.notas?`<p>${esc(q.notas)}</p>`:''}
+  ${+q.adelanto>0?`<p class="n">Adelanto: ${money(q.adelanto)}<br>Saldo: ${money(Math.max(0,t.total-q.adelanto))}</p>`:''}${q.notas?`<p>${esc(q.notas)}</p>`:''}
   <script>window.print()<\/script></body></html>`); w.document.close();
 }
 
@@ -476,8 +495,8 @@ function verPedido(id){
   <div class="form">
     <div><label>Cliente</label><b>${esc(c.nombre)}</b><div class="muted">${esc(c.telefono||'')}</div></div>
     <div><label>Estado</label>${chipEstado(p.estado)}</div>
-    <div><label>Fecha de inicio</label><input type="date" value="${p.fechaInicio||''}" onchange="byId(db.pedidos,'${id}').fechaInicio=this.value;save();route()"></div>
-    <div><label>Fecha de entrega</label><input type="date" value="${p.fechaEntrega||''}" onchange="byId(db.pedidos,'${id}').fechaEntrega=this.value;save();route()"></div>
+    <div><label>Fecha de inicio</label><b>${fmtDate(p.fechaInicio)}</b></div>
+    <div><label>Fecha de entrega</label><b class="${p.estado!=='entregado'&&p.fechaEntrega<today()?'late':''}">${fmtDate(p.fechaEntrega)}</b></div>
     <div><label>Total / pagado / saldo</label><b>${money(p.total)}</b><div class="muted">${money(pag)} pagado · <span style="color:${saldo>0.009?'var(--bad)':'var(--ok)'}">${money(Math.max(0,saldo))} saldo</span></div></div>
   </div>
   <h2 style="margin-top:18px">Servicios</h2>
@@ -487,10 +506,10 @@ function verPedido(id){
   <p>${p.stockDescontado?'<span class="chip ok">Stock de prendas descontado</span>':'<span class="chip">El stock se descuenta al pasar a "Estampado"</span>'}</p>
   <label>Notas de producción (tintas, Pantone, tallas, etc.)</label><textarea onchange="byId(db.pedidos,'${id}').notas=this.value;save()">${esc(p.notas)}</textarea>
   <h2 style="margin-top:18px">Pagos</h2>
-  ${pagos.length?`<table><tr><th>Fecha</th><th>Método</th><th>Concepto</th><th class="n">Monto</th></tr>${pagos.map(m=>`<tr><td>${fmtDate(m.fecha)}</td><td>${esc(m.metodo)}</td><td>${esc(m.concepto)}</td><td class="n">${money(m.monto)}</td></tr>`).join('')}</table>`:'<p class="muted">Sin pagos registrados.</p>'}
+  ${pagos.length?`<table><tr><th>Fecha</th><th>Método</th><th>Concepto</th><th class="n">Monto</th><th></th></tr>${pagos.map(m=>`<tr><td>${fmtDate(m.fecha)}</td><td>${esc(m.metodo)}</td><td>${esc(m.concepto)}</td><td class="n">${money(m.monto)}</td><td class="n"><button class="sm danger" title="Borrar pago" onclick="delPago('${m.id}','${id}')">✕</button></td></tr>`).join('')}</table>`:'<p class="muted">Sin pagos registrados.</p>'}
   <h2 style="margin-top:18px">Historial</h2>
   <div class="muted">${(p.historial||[]).map(h=>`${fmtDate(h.fecha)}: ${(ESTADOS.find(e=>e.k===h.estado)||{}).l}`).join(' → ')}</div>`,
-  `<button class="danger" style="margin-right:auto" onclick="eliminarPedido('${id}')">🗑 Eliminar</button>
+  `<button class="danger" onclick="eliminarPedido('${id}')">🗑 Eliminar</button><button style="margin-right:auto" onclick="editarPedido('${id}')">✏️ Editar</button>
    ${idx>0?`<button onclick="moverPedido('${id}',-1)">← ${ESTADOS[idx-1].l}</button>`:''}
    ${saldo>0.009?`<button onclick="registrarPago('${id}')">💰 Registrar pago</button>`:''}
    ${p.estado==='listo'?`<button class="wa" onclick="avisarListo('${id}')">📲 Avisar por WhatsApp</button>`:''}
@@ -510,6 +529,48 @@ function moverPedido(id,dir){
   p.estado=nuevo; (p.historial=p.historial||[]).push({fecha:today(),estado:nuevo});
   save(); route();
   if(nuevo==='listo' && dir>0) avisarListo(id); else verPedido(id);
+}
+function editarPedido(id){
+  const p=byId(db.pedidos,id);
+  window._cot = {_modo:'pedido', id, numero:p.numero, clienteId:p.clienteId, fechaInicio:p.fechaInicio||'', fechaEntrega:p.fechaEntrega||'', items:JSON.parse(JSON.stringify(p.items))};
+  formEditPedido();
+}
+function formEditPedido(){
+  const q=window._cot, p=byId(db.pedidos,q.id), prendas=db.inventario.filter(i=>i.tipo==='prenda'), elim=db.clientesEliminados[q.clienteId];
+  openDlg('Editar pedido '+q.numero, `
+  <div class="form">
+    <div class="full"><label>Cliente</label><select onchange="window._cot.clienteId=this.value">${elim?`<option value="${elim.id}" selected>${esc(elim.nombre)} (eliminado)</option>`:''}${db.clientes.map(c=>`<option value="${c.id}" ${c.id===q.clienteId?'selected':''}>${esc(c.nombre)}${c.telefono?' · '+esc(c.telefono):''}</option>`).join('')}</select></div>
+    <div><label>Fecha de inicio</label><input type="date" value="${q.fechaInicio}" onchange="window._cot.fechaInicio=this.value"></div>
+    <div><label>Fecha de entrega</label><input type="date" value="${q.fechaEntrega}" onchange="window._cot.fechaEntrega=this.value"></div>
+  </div>
+  <h2 style="margin-top:18px">Servicios</h2>
+  <div class="tablewrap"><table><tr><th style="min-width:280px">Descripción del servicio</th><th>Cantidad</th><th>Precio por unidad S/</th><th class="n">Total</th><th></th></tr>
+  ${q.items.map((it,i)=>filaItem(it,i,false,prendas,q.items.length<2)).join('')}</table></div>
+  <button class="sm" style="margin-top:8px" onclick="window._cot.items.push(nuevoItem());formEditPedido()">+ Agregar otro servicio</button>
+  ${p.stockDescontado?'<p class="muted" style="font-size:12px">El stock de prendas ya se descontó: al guardar se ajusta según los cambios.</p>':''}
+  <div class="totals" id="cotTotals" style="margin-top:12px">${totalsHTML(q.items)}</div>
+  <div class="totals"><div class="muted"><span>Pagado</span><span>${money(pagado(q.id))}</span></div><div><span>Saldo</span><b id="cotSaldo">${money(saldoActual())}</b></div></div>`,
+  `<button onclick="verPedido('${q.id}')">Cancelar</button><button class="primary" onclick="guardarEdicionPedido()">💾 Guardar cambios</button>`);
+  document.getElementById('dlg').classList.add('wide');
+}
+function guardarEdicionPedido(){
+  const q=window._cot, p=byId(db.pedidos,q.id);
+  if(!byId(db.clientes,q.clienteId) && !db.clientesEliminados[q.clienteId]) return toast('Elige un cliente');
+  if(q.fechaInicio && q.fechaEntrega && q.fechaEntrega < q.fechaInicio) return toast('La fecha de entrega no puede ser antes de la fecha de inicio');
+  if(!validarItems(q.items)) return;
+  const total = calcDoc(q.items).total, pag = pagado(q.id);
+  if(total < pag-0.009 && !confirm(`El nuevo total (${money(total)}) es menor que lo ya pagado (${money(pag)}). ¿Guardar de todas formas?`)) return;
+  if(p.stockDescontado){   // devolver lo descontado antes y descontar según los servicios nuevos
+    p.items.forEach(it=>{ const inv=byId(db.inventario,it.prendaId); if(inv) inv.stock = +inv.stock + +it.cantidad; });
+    q.items.forEach(it=>{ const inv=byId(db.inventario,it.prendaId); if(inv) inv.stock = +inv.stock - +it.cantidad; });
+  }
+  Object.assign(p, {clienteId:q.clienteId, fechaInicio:q.fechaInicio, fechaEntrega:q.fechaEntrega, items:JSON.parse(JSON.stringify(q.items)), total});
+  save(); toast('Pedido '+p.numero+' actualizado'); route(); verPedido(p.id);
+}
+function delPago(mid,pid){
+  const m=byId(db.movimientos,mid);
+  if(!confirm(`¿Borrar el pago de ${money(m.monto)} (${m.metodo}, ${fmtDate(m.fecha)})?`)) return;
+  db.movimientos=db.movimientos.filter(x=>x.id!==mid); save(); toast('Pago borrado'); route(); verPedido(pid);
 }
 function eliminarPedido(id){
   const p=byId(db.pedidos,id), pagos=db.movimientos.filter(m=>m.pedidoId===id), totPag=pagos.reduce((a,m)=>a+ +m.monto,0);
@@ -535,7 +596,7 @@ function confirmarEliminarPedido(id){
 }
 function registrarPago(pid){
   const p=byId(db.pedidos,pid); const saldo=p.total-pagado(pid);
-  const sugerido = pagado(pid)===0 ? p.total*db.config.adelantoPct/100 : saldo;
+  const sugerido = Math.max(0,saldo);
   openDlg('Registrar pago · '+p.numero, `<div class="form" id="fp">
     <div><label>Monto (saldo ${money(saldo)})</label><input type="number" step="0.01" name="monto" value="${sugerido.toFixed(2)}"></div>
     <div><label>Método</label><select name="metodo">${METODOS.map(m=>`<option>${m}</option>`).join('')}</select></div>
@@ -648,8 +709,7 @@ function config(){
     <div><label>Teléfono</label><input name="telefono" value="${esc(c.telefono)}"></div>
     <div><label>Dirección</label><input name="direccion" value="${esc(c.direccion)}"></div></div>
     <div style="margin-top:12px"><button class="primary" onclick="guardarConfig()">Guardar</button></div></div>
-  <div class="card"><h2>Cotizaciones y pagos</h2><div class="form" id="fpr">
-    <div><label>Adelanto requerido %</label><input type="number" name="adelantoPct" value="${c.adelantoPct}"></div>
+  <div class="card"><h2>Impuestos</h2><div class="form" id="fpr">
     <div><label><input type="checkbox" name="aplicarIGV" style="width:auto" ${c.aplicarIGV?'checked':''}> Aplicar IGV (%)</label><input type="number" name="igv" value="${c.igv}"></div></div>
     <div style="margin-top:12px"><button class="primary" onclick="guardarConfig()">Guardar configuración</button></div></div>
   <div class="card"><h2>Respaldo de datos</h2><p class="muted">Los datos se guardan en este navegador. Descarga un respaldo cada cierto tiempo, o úsalo para pasar la información a otra computadora.</p>
@@ -658,7 +718,7 @@ function config(){
 }
 function guardarConfig(){
   const e=formData('#fe'), p=formData('#fpr');
-  Object.assign(db.config, e, {adelantoPct:+p.adelantoPct, aplicarIGV:p.aplicarIGV, igv:+p.igv});
+  Object.assign(db.config, e, {aplicarIGV:p.aplicarIGV, igv:+p.igv});
   save(); toast('Configuración guardada'); route();
 }
 function exportar(){ const b=new Blob([JSON.stringify(db,null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='pazprints-respaldo-'+today()+'.json'; a.click(); }
