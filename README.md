@@ -17,7 +17,7 @@ En la pantalla de inicio está el botón **"Cargar datos de ejemplo"** para ver 
 | Inicio | Indicadores: pedidos en curso, atrasados, ingresos y gastos del mes, deudas y stock bajo |
 | Clientes | Registro con DNI/RUC, teléfono y deuda de cada cliente. Se pueden eliminar; sus cotizaciones y pedidos se conservan con su nombre |
 | Cotizaciones | Cotización simple en 3 pasos: cliente y fechas (inicio y entrega) → servicios (descripción, cantidad y precio por unidad con todo incluido) → total y adelanto opcional que deja el cliente, con el saldo calculado. Cliente nuevo desde la misma pantalla, envío por WhatsApp, impresión o PDF y opción de eliminar |
-| Pedidos | Tablero por estados: Pendiente → Diseño → Pantallas → Estampado → Listo → Entregado. Se pueden editar (cliente, fechas y servicios) y eliminar, con opción de devolver las prendas al inventario y borrar los pagos |
+| Pedidos | Tablero con 3 estados: Pendiente → Listo → Entregado. Al crear un pedido desde la cotización se muestra el tablero con el pedido nuevo en Pendiente. Se pueden editar (cliente, fechas y servicios) y eliminar, con opción de devolver las prendas al inventario y borrar los pagos |
 | Inventario | Prendas (color/talla) e insumos (tintas, emulsión, mallas), con alertas de stock mínimo |
 | Caja y pagos | Adelantos y saldos (Efectivo, Yape, Plin, transferencia o tarjeta), gastos y resultado del mes |
 | Configuración | Datos de la empresa, IGV, respaldo y restauración en JSON |
@@ -32,7 +32,7 @@ En la pantalla de inicio está el botón **"Cargar datos de ejemplo"** para ver 
 
 - Al aprobar una cotización (*El cliente aceptó: crear pedido*) se crea el pedido con las fechas de inicio y entrega elegidas en la cotización. Si se escribió un adelanto, se registra como pago en Caja.
 - Al editar un pedido cuyo stock ya se descontó, el inventario se ajusta según los cambios.
-- Al pasar un pedido a **Estampado** se descuentan las prendas del inventario.
+- Al pasar un pedido a **Listo** se descuentan las prendas del inventario.
 - Al registrar una compra de insumos con costo, se crea el gasto en caja y se actualiza el costo unitario.
 
 ## Limitaciones del prototipo
