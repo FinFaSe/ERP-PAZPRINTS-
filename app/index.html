@@ -104,7 +104,7 @@ button.link{border:none;background:none;color:var(--brand);padding:4px 0;text-de
     <a href="#inicio">🏠 Inicio</a>
     <a href="#clientes">👥 Clientes</a>
     <a href="#cotizaciones">📝 Cotizaciones</a>
-    <a href="#pedidos">🖨️ Pedidos / Producción</a>
+    <a href="#pedidos">🖨️ Pedidos</a>
     <a href="#inventario">📦 Inventario</a>
     <a href="#caja">💰 Caja y pagos</a>
     <a href="#config">⚙️ Configuración</a>
@@ -449,7 +449,7 @@ function imprimirCot(id){
 /* ============ PEDIDOS / PRODUCCIÓN ============ */
 function pedidos(){
   const hoy=today();
-  $('#view').innerHTML = `<h1>Pedidos / Producción</h1>
+  $('#view').innerHTML = `<h1>Pedidos</h1>
   <div class="bar"><span class="grow muted">Haz clic en un pedido para ver el detalle, avanzar su estado o registrar pagos. Los pedidos se crean desde una cotización aprobada.</span><button onclick="location.hash='cotizaciones'">+ Desde cotización</button></div>
   <div class="kanban">${ESTADOS.map(e=>{ let ps=db.pedidos.filter(p=>p.estado===e.k); if(e.k==='entregado') ps=ps.slice(-8);
     return `<div class="col"><h3>${e.l}<span>${db.pedidos.filter(p=>p.estado===e.k).length}</span></h3>
@@ -481,7 +481,8 @@ function verPedido(id){
   ${pagos.length?`<table><tr><th>Fecha</th><th>Método</th><th>Concepto</th><th class="n">Monto</th></tr>${pagos.map(m=>`<tr><td>${fmtDate(m.fecha)}</td><td>${esc(m.metodo)}</td><td>${esc(m.concepto)}</td><td class="n">${money(m.monto)}</td></tr>`).join('')}</table>`:'<p class="muted">Sin pagos registrados.</p>'}
   <h2 style="margin-top:18px">Historial</h2>
   <div class="muted">${(p.historial||[]).map(h=>`${fmtDate(h.fecha)}: ${(ESTADOS.find(e=>e.k===h.estado)||{}).l}`).join(' → ')}</div>`,
-  `${idx>0?`<button onclick="moverPedido('${id}',-1)">← ${ESTADOS[idx-1].l}</button>`:''}
+  `<button class="danger" style="margin-right:auto" onclick="eliminarPedido('${id}')">🗑 Eliminar</button>
+   ${idx>0?`<button onclick="moverPedido('${id}',-1)">← ${ESTADOS[idx-1].l}</button>`:''}
    ${saldo>0.009?`<button onclick="registrarPago('${id}')">💰 Registrar pago</button>`:''}
    ${p.estado==='listo'?`<button class="wa" onclick="avisarListo('${id}')">📲 Avisar por WhatsApp</button>`:''}
    <button onclick="closeDlg()">Cerrar</button>
@@ -500,6 +501,28 @@ function moverPedido(id,dir){
   p.estado=nuevo; (p.historial=p.historial||[]).push({fecha:today(),estado:nuevo});
   save(); route();
   if(nuevo==='listo' && dir>0) avisarListo(id); else verPedido(id);
+}
+function eliminarPedido(id){
+  const p=byId(db.pedidos,id), pagos=db.movimientos.filter(m=>m.pedidoId===id), totPag=pagos.reduce((a,m)=>a+ +m.monto,0);
+  const conInv=p.items.filter(it=>byId(db.inventario,it.prendaId)), qtyInv=conInv.reduce((a,it)=>a+ +it.cantidad,0);
+  const q=p.cotizacionId && byId(db.cotizaciones,p.cotizacionId);
+  openDlg('Eliminar pedido '+p.numero, `
+    <div class="aviso" style="background:#c92a2a22">Vas a eliminar el pedido <b>${esc(p.numero)}</b> de <b>${esc(cliente(p.clienteId).nombre)}</b> por ${money(p.total)}. Esta acción no se puede deshacer.</div>
+    <div id="fdp" style="margin-top:14px">
+    ${p.stockDescontado && qtyInv ? `<label style="font-size:14px;color:var(--text);margin-bottom:10px"><input type="checkbox" name="stock" style="width:auto" ${p.estado!=='entregado'?'checked':''}> Devolver ${qtyInv} prendas al inventario</label>`:''}
+    ${pagos.length ? `<label style="font-size:14px;color:var(--text);margin-bottom:10px"><input type="checkbox" name="pagos" style="width:auto" checked> Borrar también ${pagos.length} ${plural(pagos.length,'pago registrado','pagos registrados')} (${money(totPag)}) de la caja</label>`:''}
+    </div>
+    ${q?`<p class="muted">La cotización ${esc(q.numero)} no se borra: vuelve a quedar disponible para aprobarla de nuevo.</p>`:''}`,
+    `<button onclick="verPedido('${id}')">← Volver</button><button class="primary" style="background:var(--bad);border-color:var(--bad)" onclick="confirmarEliminarPedido('${id}')">🗑 Sí, eliminar pedido</button>`);
+}
+function confirmarEliminarPedido(id){
+  const p=byId(db.pedidos,id), d=formData('#fdp');
+  if(d.stock) p.items.forEach(it=>{ const inv=byId(db.inventario,it.prendaId); if(inv) inv.stock = +inv.stock + +it.cantidad; });
+  if(d.pagos) db.movimientos=db.movimientos.filter(m=>m.pedidoId!==id);
+  const q=p.cotizacionId && byId(db.cotizaciones,p.cotizacionId);
+  if(q){ q.pedidoId=null; q.estado='enviada'; }
+  db.pedidos=db.pedidos.filter(x=>x.id!==id);
+  save(); closeDlg(); toast('Pedido '+p.numero+' eliminado'); route();
 }
 function registrarPago(pid){
   const p=byId(db.pedidos,pid); const saldo=p.total-pagado(pid);

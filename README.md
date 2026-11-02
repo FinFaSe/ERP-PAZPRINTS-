@@ -1,4 +1,4 @@
-# ERP PazPrints · Prototipo v0.2
+# ERP PazPrints
 
 ERP para un taller de **serigrafía**. Es la versión inicial, hecha para mostrar el flujo de trabajo y recibir comentarios.
 
@@ -17,7 +17,7 @@ En la pantalla de inicio está el botón **"Cargar datos de ejemplo"** para ver 
 | Inicio | Indicadores: pedidos en curso, atrasados, ingresos y gastos del mes, deudas y stock bajo |
 | Clientes | Registro con DNI/RUC, teléfono y deuda de cada cliente |
 | Cotizaciones | Cotizador de serigrafía en 3 pasos (cliente y fechas → prendas → total). Cliente nuevo desde la misma pantalla, envío por WhatsApp, impresión o PDF y opción de eliminar |
-| Pedidos / Producción | Tablero por estados: Pendiente → Diseño → Pantallas → Estampado → Listo → Entregado |
+| Pedidos | Tablero por estados: Pendiente → Diseño → Pantallas → Estampado → Listo → Entregado. Se pueden eliminar, con opción de devolver las prendas al inventario y borrar los pagos |
 | Inventario | Prendas (color/talla) e insumos (tintas, emulsión, mallas), con alertas de stock mínimo |
 | Caja y pagos | Adelantos y saldos (Efectivo, Yape, Plin, transferencia o tarjeta), gastos y resultado del mes |
 | Configuración | Datos de la empresa, precios, respaldo y restauración en JSON |
