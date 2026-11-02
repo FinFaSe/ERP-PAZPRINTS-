@@ -329,7 +329,7 @@ function cotizaciones(){
   <div class="card tablewrap">${list.length?`<table><tr><th>N°</th><th>Fecha</th><th>Cliente</th><th class="n">Prendas</th><th class="n">Total</th><th>Entrega</th><th>Estado</th><th></th></tr>
   ${list.map(q=>{ const t=calcDoc(q.items); return `<tr><td><b>${esc(q.numero)}</b></td><td>${fmtDate(q.fecha)}</td><td>${esc(cliente(q.clienteId).nombre)}</td><td class="n">${t.qty}</td><td class="n">${money(t.total)}</td><td>${fmtDate(q.fechaEntrega)}</td>
   <td>${chipCot(q.estado)}${q.pedidoId&&byId(db.pedidos,q.pedidoId)?` <span class="chip ok">→ ${esc(byId(db.pedidos,q.pedidoId).numero)}</span>`:''}</td>
-  <td class="n" style="white-space:nowrap"><button class="sm" onclick="editCotizacion('${q.id}')">Abrir</button> <button class="sm wa" title="Enviar por WhatsApp" onclick="waCotizacion('${q.id}')">📲</button> <button class="sm" title="Imprimir / PDF" onclick="imprimirCot('${q.id}')">🖨</button> <button class="sm danger" title="Eliminar" onclick="delCot('${q.id}')">🗑</button></td></tr>`}).join('')}</table>`:'<div class="empty">Aún no hay cotizaciones. Presiona <b>+ Nueva cotización</b> para empezar.</div>'}</div>`;
+  <td class="n" style="white-space:nowrap">${q.pedidoId&&byId(db.pedidos,q.pedidoId)?`<button class="sm" title="Ya es un pedido: solo se puede ver" onclick="editCotizacion('${q.id}')">👁 Ver</button>`:`<button class="sm" onclick="editCotizacion('${q.id}')">✏️ Editar</button>`} <button class="sm wa" title="Enviar por WhatsApp" onclick="waCotizacion('${q.id}')">📲</button> <button class="sm" title="Imprimir / PDF" onclick="imprimirCot('${q.id}')">🖨</button> <button class="sm danger" title="Eliminar" onclick="delCot('${q.id}')">🗑</button></td></tr>`}).join('')}</table>`:'<div class="empty">Aún no hay cotizaciones. Presiona <b>+ Nueva cotización</b> para empezar.</div>'}</div>`;
 }
 function nuevaCotizacion(clienteId){
   window._cot = {id:null, numero:'', fecha:today(), fechaInicio:today(), fechaEntrega:addDays(today(),5), clienteId: clienteId||(db.clientes[0]?db.clientes[0].id:''), items:[nuevoItem()], estado:'borrador', notas:'', adelanto:'', metodoAdelanto:'Efectivo',
@@ -364,8 +364,8 @@ function formCotizacion(){
   const prendas = db.inventario.filter(i=>i.tipo==='prenda');
   const ped = ro && byId(db.pedidos,q.pedidoId);
   const elim = db.clientesEliminados[q.clienteId];
-  openDlg(q.id? `Cotización ${q.numero}`:'Nueva cotización', `
-  ${ro ? `<div class="aviso ok">Esta cotización ya fue aprobada y es el pedido <b>${esc(ped?ped.numero:'')}</b>. Aquí solo puedes verla, reenviarla o imprimirla.</div>`
+  openDlg(q.id? (ro? `Cotización ${q.numero}` : `Editar cotización ${q.numero}`) : 'Nueva cotización', `
+  ${ro ? `<div class="aviso ok">Esta cotización ya fue aprobada y es el pedido <b>${esc(ped?ped.numero:'')}</b>. Aquí solo puedes verla, reenviarla o imprimirla. Para cambiar el cliente, las fechas o los servicios, usa <b>✏️ Editar pedido</b>.</div>`
        : `<div class="aviso">Llena los 3 pasos y al final elige: <b>guardar como borrador</b>, <b>enviarla por WhatsApp</b> o, si el cliente ya aceptó, <b>crear el pedido</b>.</div>`}
   <h2 class="paso"><span>1</span> Cliente y fechas</h2>
   <div class="form">
@@ -393,7 +393,7 @@ function formCotizacion(){
   </div>
   <p class="muted" style="font-size:12px">Si el cliente no deja adelanto, déjalo vacío. El adelanto se registra en Caja cuando se crea el pedido.</p>
   <label style="margin-top:10px">Notas para el cliente (aparecen en el mensaje y en la impresión)</label><textarea ${dis} oninput="window._cot.notas=this.value" placeholder="Ej.: Diseño enviado por el cliente, tallas S a XL">${esc(q.notas)}</textarea>`,
-  ro ? `<button class="danger" style="margin-right:auto" onclick="delCot('${q.id}')">🗑 Eliminar</button><button onclick="closeDlg()">Cerrar</button><button onclick="imprimirCot('${q.id}')">🖨 Imprimir</button><button class="wa" onclick="waCotizacion('${q.id}')">📲 Reenviar por WhatsApp</button>`
+  ro ? `<button class="danger" onclick="delCot('${q.id}')">🗑 Eliminar</button>${ped?`<button style="margin-right:auto" onclick="editarPedido('${ped.id}')">✏️ Editar pedido</button>`:''}<button onclick="closeDlg()">Cerrar</button><button onclick="imprimirCot('${q.id}')">🖨 Imprimir</button><button class="wa" onclick="waCotizacion('${q.id}')">📲 Reenviar por WhatsApp</button>`
      : `${q.id?`<button class="danger" style="margin-right:auto" onclick="delCot('${q.id}')">🗑 Eliminar</button>`:''}<button onclick="closeDlg()">Cancelar</button><button onclick="saveCot()">💾 Guardar borrador</button><button class="wa" onclick="if(saveCot(true)) waCotizacion(window._cot.id)">📲 Guardar y enviar por WhatsApp</button><button class="primary" onclick="aPedido()">✔ El cliente aceptó: crear pedido</button>`);
   document.getElementById('dlg').classList.add('wide');
 }
