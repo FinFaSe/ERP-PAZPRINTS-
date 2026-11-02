@@ -1,0 +1,555 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PazPrints ERP</title>
+<style>
+:root{
+  --bg:#f5f6f8; --panel:#ffffff; --text:#1d2330; --muted:#6b7280; --line:#e3e6eb;
+  --brand:#d6336c; --brand-2:#a61e4d; --ok:#2f9e44; --warn:#e8590c; --bad:#c92a2a; --info:#1971c2;
+  --chip:#f1f3f5; --shadow:0 1px 3px rgba(0,0,0,.08);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#14161b; --panel:#1d2027; --text:#e8eaee; --muted:#9aa1ad; --line:#2d313a;
+    --chip:#272b33; --shadow:0 1px 3px rgba(0,0,0,.4);
+  }
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--text);font-size:14px}
+a{color:inherit}
+.layout{display:flex;min-height:100vh}
+nav.side{width:220px;background:var(--panel);border-right:1px solid var(--line);padding:16px 10px;position:sticky;top:0;height:100vh;flex-shrink:0}
+.logo{font-weight:800;font-size:20px;padding:4px 10px 18px;color:var(--brand)}
+.logo small{display:block;font-size:11px;color:var(--muted);font-weight:500}
+nav.side a{display:block;padding:9px 12px;border-radius:8px;text-decoration:none;color:var(--muted);margin-bottom:2px}
+nav.side a:hover{background:var(--chip);color:var(--text)}
+nav.side a.active{background:var(--brand);color:#fff}
+main{flex:1;padding:22px 28px;max-width:1200px;min-width:0}
+h1{font-size:22px;margin:0 0 16px}
+h2{font-size:16px;margin:0 0 10px}
+.bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+.bar .grow{flex:1}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;box-shadow:var(--shadow);margin-bottom:16px}
+.grid{display:grid;gap:14px}
+.kpis{grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}
+.kpi .v{font-size:24px;font-weight:700;margin-top:4px}
+.kpi .l{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.04em}
+.two{grid-template-columns:1fr 1fr}
+table{width:100%;border-collapse:collapse}
+th,td{text-align:left;padding:8px;border-bottom:1px solid var(--line);vertical-align:middle}
+th{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase}
+td.n,th.n{text-align:right}
+.tablewrap{overflow-x:auto}
+button,.btn{font:inherit;border:1px solid var(--line);background:var(--panel);color:var(--text);padding:7px 12px;border-radius:8px;cursor:pointer}
+button:hover{border-color:var(--brand)}
+button.primary{background:var(--brand);border-color:var(--brand);color:#fff}
+button.primary:hover{background:var(--brand-2)}
+button.danger{color:var(--bad)}
+button.sm{padding:4px 8px;font-size:12px}
+input,select,textarea{font:inherit;padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text);width:100%}
+textarea{min-height:60px}
+label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px}
+.form{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+.form .full{grid-column:1/-1}
+.chip{display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;background:var(--chip);white-space:nowrap}
+.chip.ok{background:#2f9e4422;color:var(--ok)} .chip.warn{background:#e8590c22;color:var(--warn)}
+.chip.bad{background:#c92a2a22;color:var(--bad)} .chip.info{background:#1971c222;color:var(--info)}
+.muted{color:var(--muted)}
+.empty{padding:24px;text-align:center;color:var(--muted)}
+.kanban{display:grid;grid-template-columns:repeat(6,minmax(150px,1fr));gap:10px;overflow-x:auto}
+.col{background:var(--chip);border-radius:10px;padding:8px;min-height:120px}
+.col h3{font-size:12px;text-transform:uppercase;color:var(--muted);margin:4px 4px 8px;display:flex;justify-content:space-between}
+.tk{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px;margin-bottom:8px;cursor:pointer}
+.tk:hover{border-color:var(--brand)}
+.tk b{display:block}
+.late{color:var(--bad);font-weight:600}
+dialog{border:none;border-radius:14px;padding:0;max-width:880px;width:95vw;background:var(--panel);color:var(--text)}
+dialog::backdrop{background:rgba(0,0,0,.45)}
+.dlg-h{padding:14px 18px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}
+.dlg-b{padding:18px;max-height:70vh;overflow:auto}
+.dlg-f{padding:12px 18px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:8px}
+.totals{margin-left:auto;max-width:320px}
+.totals div{display:flex;justify-content:space-between;padding:3px 0}
+.totals .t{font-weight:700;font-size:16px;border-top:1px solid var(--line);margin-top:4px;padding-top:6px}
+.toast{position:fixed;bottom:20px;right:20px;background:var(--text);color:var(--bg);padding:10px 16px;border-radius:8px;opacity:0;transition:.25s;pointer-events:none}
+.toast.show{opacity:1}
+.menu-btn{display:none}
+@media (max-width:820px){
+  nav.side{position:fixed;left:-240px;z-index:10;transition:.2s}
+  nav.side.open{left:0}
+  .menu-btn{display:inline-block;margin-bottom:10px}
+  main{padding:16px}
+  .two{grid-template-columns:1fr}
+}
+@media print{
+  nav.side,.bar,.noprint,.dlg-f{display:none!important}
+  body{background:#fff}
+}
+</style>
+</head>
+<body>
+<div class="layout">
+  <nav class="side" id="side">
+    <div class="logo">PazPrints<small>ERP de serigrafía · prototipo v0.1</small></div>
+    <a href="#inicio">🏠 Inicio</a>
+    <a href="#clientes">👥 Clientes</a>
+    <a href="#cotizaciones">📝 Cotizaciones</a>
+    <a href="#pedidos">🖨️ Pedidos / Producción</a>
+    <a href="#inventario">📦 Inventario</a>
+    <a href="#caja">💰 Caja y pagos</a>
+    <a href="#config">⚙️ Configuración</a>
+  </nav>
+  <main>
+    <button class="menu-btn" onclick="document.getElementById('side').classList.toggle('open')">☰ Menú</button>
+    <div id="view"></div>
+  </main>
+</div>
+<dialog id="dlg"><div class="dlg-h"><b id="dlgTitle"></b><button class="sm" onclick="closeDlg()">✕</button></div><div class="dlg-b" id="dlgBody"></div><div class="dlg-f" id="dlgFoot"></div></dialog>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============ Datos y almacenamiento ============ */
+const KEY = 'pazprints_erp_v1';
+const ESTADOS = [
+  {k:'pendiente', l:'Pendiente'},
+  {k:'diseno', l:'Diseño / arte'},
+  {k:'pantallas', l:'Pantallas'},
+  {k:'estampado', l:'Estampado'},
+  {k:'listo', l:'Listo'},
+  {k:'entregado', l:'Entregado'}
+];
+const METODOS = ['Efectivo','Yape','Plin','Transferencia','Tarjeta'];
+const defaultConfig = () => ({
+  empresa:'PazPrints', ruc:'', telefono:'', direccion:'',
+  costoPantalla:35,          // por cada pantalla (color × ubicación), cobro único por pedido
+  costoColorPrenda:1.5,      // por color, por ubicación, por prenda
+  descuentos:[{min:50,pct:5},{min:100,pct:10},{min:300,pct:15}],
+  aplicarIGV:false, igv:18, validezDias:7, adelantoPct:50
+});
+let db;
+function load(){
+  try{ db = JSON.parse(localStorage.getItem(KEY)); }catch(e){ db = null; }
+  if(!db){ db = {config:defaultConfig(), clientes:[], inventario:[], cotizaciones:[], pedidos:[], movimientos:[], seq:{cot:0,ped:0}}; }
+  db.config = Object.assign(defaultConfig(), db.config||{});
+}
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(db)); }catch(e){ toast('No se pudo guardar en el navegador'); } }
+const uid = () => Math.random().toString(36).slice(2,10)+Date.now().toString(36).slice(-4);
+const today = () => new Date().toISOString().slice(0,10);
+const addDays = (d,n) => { const x=new Date(d+'T00:00:00'); x.setDate(x.getDate()+n); return x.toISOString().slice(0,10); };
+const money = n => 'S/ ' + (Number(n)||0).toLocaleString('es-PE',{minimumFractionDigits:2,maximumFractionDigits:2});
+const esc = s => String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmtDate = d => d ? new Date(d+'T00:00:00').toLocaleDateString('es-PE',{day:'2-digit',month:'short',year:'numeric'}) : '—';
+const byId = (arr,id) => arr.find(x=>x.id===id);
+const cliente = id => byId(db.clientes,id) || {nombre:'(sin cliente)'};
+const $ = s => document.querySelector(s);
+function toast(m){ const t=$('#toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('show'),2200); }
+
+/* ============ Cálculo de precios ============ */
+function calcItem(it){
+  const c = db.config;
+  const pantallas = (+it.colores||0) * (+it.ubicaciones||0);
+  const unit = (+it.precioPrenda||0) + pantallas * c.costoColorPrenda;
+  const setup = pantallas * c.costoPantalla;
+  const precioUnit = it.precioManual !== '' && it.precioManual != null ? +it.precioManual : unit;
+  return {pantallas, precioUnit, setup: it.precioManual !== '' && it.precioManual != null ? 0 : setup, total: precioUnit*(+it.cantidad||0) + (it.precioManual !== '' && it.precioManual != null ? 0 : setup)};
+}
+function calcDoc(items){
+  const c = db.config;
+  let sub=0, qty=0;
+  items.forEach(it=>{ sub += calcItem(it).total; qty += +it.cantidad||0; });
+  const d = [...c.descuentos].sort((a,b)=>b.min-a.min).find(d=>qty>=d.min);
+  const pct = d ? d.pct : 0;
+  const desc = sub*pct/100;
+  const base = sub-desc;
+  const igv = c.aplicarIGV ? base*c.igv/100 : 0;
+  return {qty, sub, pct, desc, igv, total: base+igv};
+}
+const pagado = pid => db.movimientos.filter(m=>m.pedidoId===pid && m.tipo==='ingreso').reduce((a,m)=>a+ +m.monto,0);
+
+/* ============ Diálogo genérico ============ */
+function openDlg(title, body, foot){ $('#dlgTitle').textContent=title; $('#dlgBody').innerHTML=body; $('#dlgFoot').innerHTML=foot||''; $('#dlg').showModal(); }
+function closeDlg(){ $('#dlg').close(); }
+function formData(sel){ const o={}; document.querySelectorAll(sel+' [name]').forEach(el=>{ o[el.name] = el.type==='checkbox'? el.checked : el.value; }); return o; }
+
+/* ============ Router ============ */
+const views = {inicio, clientes, cotizaciones, pedidos, inventario, caja, config};
+function route(){
+  const r = (location.hash.slice(1)||'inicio');
+  document.querySelectorAll('nav.side a').forEach(a=>a.classList.toggle('active', a.getAttribute('href')==='#'+r));
+  $('#side').classList.remove('open');
+  (views[r]||inicio)();
+}
+window.addEventListener('hashchange', route);
+
+/* ============ INICIO ============ */
+function inicio(){
+  const activos = db.pedidos.filter(p=>p.estado!=='entregado');
+  const hoy = today();
+  const atrasados = activos.filter(p=>p.fechaEntrega && p.fechaEntrega<hoy);
+  const mes = hoy.slice(0,7);
+  const ingresosMes = db.movimientos.filter(m=>m.tipo==='ingreso'&&m.fecha.startsWith(mes)).reduce((a,m)=>a+ +m.monto,0);
+  const egresosMes = db.movimientos.filter(m=>m.tipo==='egreso'&&m.fecha.startsWith(mes)).reduce((a,m)=>a+ +m.monto,0);
+  const porCobrar = db.pedidos.reduce((a,p)=>a+Math.max(0,p.total-pagado(p.id)),0);
+  const bajo = db.inventario.filter(i=>+i.stock<=+i.minimo);
+  const proximos = [...activos].sort((a,b)=>(a.fechaEntrega||'9').localeCompare(b.fechaEntrega||'9')).slice(0,6);
+  $('#view').innerHTML = `
+  <h1>Hola 👋 · ${esc(db.config.empresa)}</h1>
+  ${!db.clientes.length && !db.pedidos.length ? `<div class="card"><h2>¿Primera vez?</h2><p class="muted">El sistema está vacío. Puedes cargar datos de ejemplo para ver cómo funciona, y borrarlos después desde Configuración.</p><button class="primary" onclick="cargarDemo()">Cargar datos de ejemplo</button></div>`:''}
+  <div class="grid kpis">
+    <div class="card kpi"><div class="l">Pedidos en curso</div><div class="v">${activos.length}</div></div>
+    <div class="card kpi"><div class="l">Atrasados</div><div class="v" style="color:${atrasados.length?'var(--bad)':'inherit'}">${atrasados.length}</div></div>
+    <div class="card kpi"><div class="l">Ingresos del mes</div><div class="v">${money(ingresosMes)}</div></div>
+    <div class="card kpi"><div class="l">Gastos del mes</div><div class="v">${money(egresosMes)}</div></div>
+    <div class="card kpi"><div class="l">Por cobrar</div><div class="v">${money(porCobrar)}</div></div>
+  </div>
+  <div class="grid two">
+    <div class="card"><h2>Próximas entregas</h2>
+      ${proximos.length? `<table><tr><th>Pedido</th><th>Cliente</th><th>Entrega</th><th>Estado</th></tr>
+      ${proximos.map(p=>`<tr style="cursor:pointer" onclick="verPedido('${p.id}')"><td>${esc(p.numero)}</td><td>${esc(cliente(p.clienteId).nombre)}</td><td class="${p.fechaEntrega<hoy?'late':''}">${fmtDate(p.fechaEntrega)}</td><td>${chipEstado(p.estado)}</td></tr>`).join('')}</table>`:'<div class="empty">No hay pedidos en curso</div>'}
+    </div>
+    <div class="card"><h2>Stock bajo</h2>
+      ${bajo.length? `<table><tr><th>Ítem</th><th class="n">Stock</th><th class="n">Mínimo</th></tr>
+      ${bajo.map(i=>`<tr><td>${esc(nombreInv(i))}</td><td class="n" style="color:var(--bad)">${i.stock} ${esc(i.unidad)}</td><td class="n">${i.minimo}</td></tr>`).join('')}</table>`:'<div class="empty">Todo el inventario está sobre el mínimo ✅</div>'}
+    </div>
+  </div>`;
+}
+function chipEstado(k){ const cls={pendiente:'',diseno:'info',pantallas:'info',estampado:'warn',listo:'ok',entregado:'ok'}[k]; return `<span class="chip ${cls}">${(ESTADOS.find(e=>e.k===k)||{l:k}).l}</span>`; }
+
+/* ============ CLIENTES ============ */
+function clientes(){
+  const q = (window._qc||'').toLowerCase();
+  const list = db.clientes.filter(c=>!q || (c.nombre+' '+c.doc+' '+c.telefono).toLowerCase().includes(q));
+  $('#view').innerHTML = `<h1>Clientes</h1>
+  <div class="bar"><input class="grow" placeholder="Buscar por nombre, DNI/RUC o teléfono…" value="${esc(window._qc||'')}" oninput="window._qc=this.value;clientes();this.focus();this.setSelectionRange(this.value.length,this.value.length)"><button class="primary" onclick="editCliente()">+ Nuevo cliente</button></div>
+  <div class="card tablewrap">${list.length?`<table><tr><th>Nombre</th><th>DNI/RUC</th><th>Teléfono</th><th>Email</th><th class="n">Pedidos</th><th class="n">Deuda</th><th></th></tr>
+  ${list.map(c=>{ const peds=db.pedidos.filter(p=>p.clienteId===c.id); const deuda=peds.reduce((a,p)=>a+Math.max(0,p.total-pagado(p.id)),0);
+    return `<tr><td><b>${esc(c.nombre)}</b>${c.notas?`<div class="muted">${esc(c.notas)}</div>`:''}</td><td>${esc(c.doc)}</td><td>${esc(c.telefono)}</td><td>${esc(c.email)}</td><td class="n">${peds.length}</td><td class="n" style="color:${deuda?'var(--bad)':'inherit'}">${money(deuda)}</td>
+    <td class="n"><button class="sm" onclick="editCliente('${c.id}')">Editar</button> <button class="sm" onclick="nuevaCotizacion('${c.id}')">Cotizar</button></td></tr>`}).join('')}</table>`:'<div class="empty">No hay clientes registrados</div>'}</div>`;
+}
+function editCliente(id){
+  const c = id? byId(db.clientes,id) : {nombre:'',doc:'',telefono:'',email:'',direccion:'',notas:''};
+  openDlg(id?'Editar cliente':'Nuevo cliente', `<div class="form" id="fc">
+    <div class="full"><label>Nombre o razón social *</label><input name="nombre" value="${esc(c.nombre)}"></div>
+    <div><label>DNI / RUC</label><input name="doc" value="${esc(c.doc)}"></div>
+    <div><label>Teléfono / WhatsApp</label><input name="telefono" value="${esc(c.telefono)}"></div>
+    <div><label>Email</label><input name="email" value="${esc(c.email)}"></div>
+    <div class="full"><label>Dirección</label><input name="direccion" value="${esc(c.direccion)}"></div>
+    <div class="full"><label>Notas</label><textarea name="notas">${esc(c.notas)}</textarea></div></div>`,
+    `${id && !db.pedidos.some(p=>p.clienteId===id) && !db.cotizaciones.some(q=>q.clienteId===id)?`<button class="danger" onclick="delCliente('${id}')">Eliminar</button>`:''}<button onclick="closeDlg()">Cancelar</button><button class="primary" onclick="saveCliente('${id||''}')">Guardar</button>`);
+}
+function saveCliente(id){
+  const d = formData('#fc'); if(!d.nombre.trim()) return toast('El nombre es obligatorio');
+  if(id) Object.assign(byId(db.clientes,id), d); else db.clientes.push({id:uid(), ...d, creado:today()});
+  save(); closeDlg(); toast('Cliente guardado'); route();
+}
+function delCliente(id){ if(!confirm('¿Eliminar este cliente?')) return; db.clientes=db.clientes.filter(c=>c.id!==id); save(); closeDlg(); route(); }
+
+/* ============ COTIZACIONES ============ */
+const estadoCot = {borrador:'',enviada:'info',aprobada:'ok',rechazada:'bad'};
+function cotizaciones(){
+  const list = [...db.cotizaciones].reverse();
+  $('#view').innerHTML = `<h1>Cotizaciones</h1>
+  <div class="bar"><span class="grow muted">Arma presupuestos y conviértelos en pedidos cuando el cliente apruebe.</span><button class="primary" onclick="nuevaCotizacion()">+ Nueva cotización</button></div>
+  <div class="card tablewrap">${list.length?`<table><tr><th>N°</th><th>Fecha</th><th>Cliente</th><th class="n">Prendas</th><th class="n">Total</th><th>Estado</th><th></th></tr>
+  ${list.map(q=>{ const t=calcDoc(q.items); return `<tr><td><b>${esc(q.numero)}</b></td><td>${fmtDate(q.fecha)}</td><td>${esc(cliente(q.clienteId).nombre)}</td><td class="n">${t.qty}</td><td class="n">${money(t.total)}</td><td><span class="chip ${estadoCot[q.estado]}">${q.estado}</span>${q.pedidoId?` <span class="chip ok">→ ${esc((byId(db.pedidos,q.pedidoId)||{}).numero||'')}</span>`:''}</td>
+  <td class="n"><button class="sm" onclick="editCotizacion('${q.id}')">Abrir</button> <button class="sm" onclick="imprimirCot('${q.id}')">Imprimir</button></td></tr>`}).join('')}</table>`:'<div class="empty">Aún no hay cotizaciones</div>'}</div>`;
+}
+function nuevaCotizacion(clienteId){
+  if(!db.clientes.length){ toast('Primero registra un cliente'); location.hash='clientes'; return; }
+  window._cot = {id:null, numero:'', fecha:today(), clienteId: clienteId||db.clientes[0].id, items:[nuevoItem()], estado:'borrador', notas:''};
+  formCotizacion();
+}
+function nuevoItem(){ return {descripcion:'Polo algodón cuello redondo', prendaId:'', cantidad:12, colores:1, ubicaciones:1, precioPrenda:15, precioManual:''}; }
+function editCotizacion(id){ window._cot = JSON.parse(JSON.stringify(byId(db.cotizaciones,id))); formCotizacion(); }
+function formCotizacion(){
+  const q = window._cot, ro = !!q.pedidoId;
+  const prendas = db.inventario.filter(i=>i.tipo==='prenda');
+  const t = calcDoc(q.items);
+  openDlg(q.id? `Cotización ${q.numero}`:'Nueva cotización', `
+  <div class="form" id="fq">
+    <div><label>Cliente</label><select name="clienteId" ${ro?'disabled':''} onchange="window._cot.clienteId=this.value">${db.clientes.map(c=>`<option value="${c.id}" ${c.id===q.clienteId?'selected':''}>${esc(c.nombre)}</option>`).join('')}</select></div>
+    <div><label>Fecha</label><input type="date" value="${q.fecha}" ${ro?'disabled':''} onchange="window._cot.fecha=this.value"></div>
+    <div><label>Estado</label><select ${ro?'disabled':''} onchange="window._cot.estado=this.value">${Object.keys(estadoCot).map(e=>`<option ${e===q.estado?'selected':''}>${e}</option>`).join('')}</select></div>
+  </div>
+  <h2 style="margin-top:18px">Detalle</h2>
+  <div class="tablewrap"><table><tr><th style="min-width:200px">Descripción / prenda</th><th>Cant.</th><th>Colores</th><th>Ubicac.</th><th>Prenda S/</th><th>P. manual</th><th class="n">P. unit.</th><th class="n">Pantallas</th><th class="n">Total</th><th></th></tr>
+  ${q.items.map((it,i)=>{ const c=calcItem(it); return `<tr>
+    <td><select style="margin-bottom:4px" ${ro?'disabled':''} onchange="setPrenda(${i},this.value)"><option value="">— Prenda del cliente / sin inventario —</option>${prendas.map(p=>`<option value="${p.id}" ${p.id===it.prendaId?'selected':''}>${esc(nombreInv(p))} (stock ${p.stock})</option>`).join('')}</select>
+        <input value="${esc(it.descripcion)}" ${ro?'disabled':''} onchange="setIt(${i},'descripcion',this.value,false)"></td>
+    <td><input type="number" min="1" style="width:70px" value="${it.cantidad}" ${ro?'disabled':''} onchange="setIt(${i},'cantidad',this.value)"></td>
+    <td><input type="number" min="0" max="12" style="width:60px" value="${it.colores}" ${ro?'disabled':''} onchange="setIt(${i},'colores',this.value)"></td>
+    <td><input type="number" min="0" max="6" style="width:60px" value="${it.ubicaciones}" ${ro?'disabled':''} onchange="setIt(${i},'ubicaciones',this.value)"></td>
+    <td><input type="number" min="0" step="0.1" style="width:80px" value="${it.precioPrenda}" ${ro?'disabled':''} onchange="setIt(${i},'precioPrenda',this.value)"></td>
+    <td><input type="number" min="0" step="0.1" style="width:80px" placeholder="auto" value="${it.precioManual}" ${ro?'disabled':''} onchange="setIt(${i},'precioManual',this.value)"></td>
+    <td class="n">${money(c.precioUnit)}</td><td class="n">${c.pantallas} · ${money(c.setup)}</td><td class="n"><b>${money(c.total)}</b></td>
+    <td>${ro||q.items.length<2?'':`<button class="sm danger" onclick="window._cot.items.splice(${i},1);formCotizacion()">✕</button>`}</td></tr>`}).join('')}
+  </table></div>
+  ${ro?'':`<button class="sm" style="margin-top:8px" onclick="window._cot.items.push(nuevoItem());formCotizacion()">+ Agregar línea</button>`}
+  <p class="muted" style="font-size:12px">Precio unitario = prenda + (colores × ubicaciones × ${money(db.config.costoColorPrenda)}). Cada pantalla (color × ubicación) suma ${money(db.config.costoPantalla)} una sola vez. Si escribes un precio manual, reemplaza el cálculo y no se cobran pantallas aparte. Puedes cambiar estos valores en Configuración.</p>
+  <div class="totals">
+    <div><span>Subtotal (${t.qty} prendas)</span><span>${money(t.sub)}</span></div>
+    ${t.pct?`<div><span>Descuento por volumen (${t.pct}%)</span><span>− ${money(t.desc)}</span></div>`:''}
+    ${db.config.aplicarIGV?`<div><span>IGV (${db.config.igv}%)</span><span>${money(t.igv)}</span></div>`:''}
+    <div class="t"><span>Total</span><span>${money(t.total)}</span></div>
+  </div>
+  <label style="margin-top:10px">Notas para el cliente</label><textarea ${ro?'disabled':''} onchange="window._cot.notas=this.value">${esc(q.notas)}</textarea>
+  ${ro?`<p class="chip ok" style="margin-top:10px">Convertida en pedido ${esc(byId(db.pedidos,q.pedidoId)?.numero||'')}</p>`:''}`,
+  ro? `<button onclick="closeDlg()">Cerrar</button>` :
+  `${q.id?`<button class="danger" onclick="delCot('${q.id}')">Eliminar</button>`:''}<button onclick="closeDlg()">Cancelar</button><button onclick="saveCot()">Guardar</button>${q.id?`<button class="primary" onclick="aPedido()">✔ Aprobar y crear pedido</button>`:''}`);
+}
+function setIt(i,k,v,rerender=true){ window._cot.items[i][k] = (k==='descripcion'||k==='precioManual')? v : +v; if(rerender) formCotizacion(); }
+function setPrenda(i,pid){ const it=window._cot.items[i]; it.prendaId=pid; const p=byId(db.inventario,pid); if(p){ it.descripcion=nombreInv(p); if(p.precioVenta) it.precioPrenda=+p.precioVenta; } formCotizacion(); }
+function saveCot(silent){
+  const q = window._cot;
+  if(!q.id){ db.seq.cot++; q.id=uid(); q.numero='COT-'+String(db.seq.cot).padStart(4,'0'); db.cotizaciones.push(q); }
+  else { const i=db.cotizaciones.findIndex(x=>x.id===q.id); db.cotizaciones[i]=q; }
+  q.total = calcDoc(q.items).total;
+  save(); if(!silent){ closeDlg(); toast('Cotización guardada'); route(); }
+}
+function delCot(id){ if(!confirm('¿Eliminar cotización?')) return; db.cotizaciones=db.cotizaciones.filter(q=>q.id!==id); save(); closeDlg(); route(); }
+function aPedido(){
+  const q = window._cot; q.estado='aprobada'; saveCot(true);
+  db.seq.ped++;
+  const p = {id:uid(), numero:'PED-'+String(db.seq.ped).padStart(4,'0'), cotizacionId:q.id, clienteId:q.clienteId, fecha:today(), fechaEntrega:addDays(today(),5),
+    items:JSON.parse(JSON.stringify(q.items)), total:calcDoc(q.items).total, estado:'pendiente', notas:q.notas||'', stockDescontado:false, historial:[{fecha:today(),estado:'pendiente'}]};
+  db.pedidos.push(p); q.pedidoId=p.id; save(); closeDlg(); toast('Pedido '+p.numero+' creado'); location.hash='pedidos'; setTimeout(()=>verPedido(p.id),50);
+}
+function imprimirCot(id){
+  const q=byId(db.cotizaciones,id), c=cliente(q.clienteId), t=calcDoc(q.items), cf=db.config;
+  const w = window.open('','_blank'); if(!w) return toast('Permite ventanas emergentes para imprimir');
+  w.document.write(`<html><head><title>${q.numero}</title><style>body{font-family:system-ui;padding:30px;color:#222}table{width:100%;border-collapse:collapse;margin:20px 0}th,td{border-bottom:1px solid #ddd;padding:8px;text-align:left}.n{text-align:right}h1{color:#d6336c;margin:0}</style></head><body>
+  <h1>${esc(cf.empresa)}</h1><div>${esc(cf.ruc?'RUC '+cf.ruc:'')} ${esc(cf.telefono)} ${esc(cf.direccion)}</div><hr>
+  <h2>Cotización ${esc(q.numero)}</h2><p>Fecha: ${fmtDate(q.fecha)} · Válida hasta: ${fmtDate(addDays(q.fecha,cf.validezDias))}<br>Cliente: <b>${esc(c.nombre)}</b> ${esc(c.doc||'')}</p>
+  <table><tr><th>Descripción</th><th class="n">Cant.</th><th>Estampado</th><th class="n">P. unit.</th><th class="n">Total</th></tr>
+  ${q.items.map(it=>{const x=calcItem(it);return `<tr><td>${esc(it.descripcion)}</td><td class="n">${it.cantidad}</td><td>${it.colores} color(es) × ${it.ubicaciones} ubicación(es)</td><td class="n">${money(x.precioUnit)}</td><td class="n">${money(x.total)}</td></tr>`}).join('')}</table>
+  <p class="n">Subtotal: ${money(t.sub)}<br>${t.pct?`Descuento ${t.pct}%: − ${money(t.desc)}<br>`:''}${cf.aplicarIGV?`IGV ${cf.igv}%: ${money(t.igv)}<br>`:''}<b style="font-size:18px">Total: ${money(t.total)}</b></p>
+  <p>Adelanto requerido: ${cf.adelantoPct}% (${money(t.total*cf.adelantoPct/100)})</p>${q.notas?`<p>${esc(q.notas)}</p>`:''}
+  <script>window.print()<\/script></body></html>`); w.document.close();
+}
+
+/* ============ PEDIDOS / PRODUCCIÓN ============ */
+function pedidos(){
+  const hoy=today();
+  $('#view').innerHTML = `<h1>Pedidos / Producción</h1>
+  <div class="bar"><span class="grow muted">Haz clic en un pedido para ver el detalle, avanzar su estado o registrar pagos. Los pedidos se crean desde una cotización aprobada.</span><button onclick="location.hash='cotizaciones'">+ Desde cotización</button></div>
+  <div class="kanban">${ESTADOS.map(e=>{ let ps=db.pedidos.filter(p=>p.estado===e.k); if(e.k==='entregado') ps=ps.slice(-8);
+    return `<div class="col"><h3>${e.l}<span>${db.pedidos.filter(p=>p.estado===e.k).length}</span></h3>
+    ${ps.map(p=>{ const saldo=p.total-pagado(p.id); const qty=p.items.reduce((a,i)=>a+ +i.cantidad,0);
+      return `<div class="tk" onclick="verPedido('${p.id}')"><b>${esc(p.numero)} · ${esc(cliente(p.clienteId).nombre)}</b>
+      <div class="muted">${qty} prendas · ${money(p.total)}</div>
+      <div class="${p.estado!=='entregado'&&p.fechaEntrega<hoy?'late':'muted'}">📅 ${fmtDate(p.fechaEntrega)}</div>
+      ${saldo>0.009?`<span class="chip warn">Saldo ${money(saldo)}</span>`:'<span class="chip ok">Pagado</span>'}</div>`}).join('')}</div>`}).join('')}</div>`;
+}
+function verPedido(id){
+  const p=byId(db.pedidos,id), c=cliente(p.clienteId), pag=pagado(id), saldo=p.total-pag;
+  const idx=ESTADOS.findIndex(e=>e.k===p.estado);
+  const pagos=db.movimientos.filter(m=>m.pedidoId===id);
+  openDlg(`Pedido ${p.numero}`, `
+  <div class="form">
+    <div><label>Cliente</label><b>${esc(c.nombre)}</b><div class="muted">${esc(c.telefono||'')}</div></div>
+    <div><label>Estado</label>${chipEstado(p.estado)}</div>
+    <div><label>Fecha de entrega</label><input type="date" value="${p.fechaEntrega||''}" onchange="byId(db.pedidos,'${id}').fechaEntrega=this.value;save();route()"></div>
+    <div><label>Total / pagado / saldo</label><b>${money(p.total)}</b><div class="muted">${money(pag)} pagado · <span style="color:${saldo>0.009?'var(--bad)':'var(--ok)'}">${money(Math.max(0,saldo))} saldo</span></div></div>
+  </div>
+  <h2 style="margin-top:18px">Prendas</h2>
+  <table><tr><th>Descripción</th><th class="n">Cant.</th><th>Estampado</th><th>Inventario</th></tr>
+  ${p.items.map(it=>{ const inv=byId(db.inventario,it.prendaId); return `<tr><td>${esc(it.descripcion)}</td><td class="n">${it.cantidad}</td><td>${it.colores} col × ${it.ubicaciones} ubic.</td><td>${inv?`${esc(nombreInv(inv))} <span class="muted">(stock ${inv.stock})</span>`:'<span class="muted">Prenda del cliente</span>'}</td></tr>`}).join('')}</table>
+  <p>${p.stockDescontado?'<span class="chip ok">Stock de prendas descontado</span>':'<span class="chip">El stock se descuenta al pasar a "Estampado"</span>'}</p>
+  <label>Notas de producción (tintas, Pantone, tallas, etc.)</label><textarea onchange="byId(db.pedidos,'${id}').notas=this.value;save()">${esc(p.notas)}</textarea>
+  <h2 style="margin-top:18px">Pagos</h2>
+  ${pagos.length?`<table><tr><th>Fecha</th><th>Método</th><th>Concepto</th><th class="n">Monto</th></tr>${pagos.map(m=>`<tr><td>${fmtDate(m.fecha)}</td><td>${esc(m.metodo)}</td><td>${esc(m.concepto)}</td><td class="n">${money(m.monto)}</td></tr>`).join('')}</table>`:'<p class="muted">Sin pagos registrados.</p>'}
+  <h2 style="margin-top:18px">Historial</h2>
+  <div class="muted">${(p.historial||[]).map(h=>`${fmtDate(h.fecha)}: ${(ESTADOS.find(e=>e.k===h.estado)||{}).l}`).join(' → ')}</div>`,
+  `${idx>0?`<button onclick="moverPedido('${id}',-1)">← ${ESTADOS[idx-1].l}</button>`:''}
+   ${saldo>0.009?`<button onclick="registrarPago('${id}')">💰 Registrar pago</button>`:''}
+   <button onclick="closeDlg()">Cerrar</button>
+   ${idx<ESTADOS.length-1?`<button class="primary" onclick="moverPedido('${id}',1)">${ESTADOS[idx+1].l} →</button>`:''}`);
+}
+function moverPedido(id,dir){
+  const p=byId(db.pedidos,id); const idx=ESTADOS.findIndex(e=>e.k===p.estado); const nuevo=ESTADOS[idx+dir].k;
+  const iEst = ESTADOS.findIndex(e=>e.k==='estampado');
+  if(dir>0 && idx+dir>=iEst && !p.stockDescontado){
+    const faltas = p.items.filter(it=>it.prendaId).map(it=>({it,inv:byId(db.inventario,it.prendaId)})).filter(x=>x.inv && +x.inv.stock < +x.it.cantidad);
+    if(faltas.length && !confirm('Stock insuficiente para: '+faltas.map(x=>nombreInv(x.inv)).join(', ')+'.\n¿Continuar de todas formas? (el stock quedará negativo)')) return;
+    p.items.forEach(it=>{ const inv=byId(db.inventario,it.prendaId); if(inv) inv.stock = +inv.stock - +it.cantidad; });
+    p.stockDescontado = true;
+  }
+  if(nuevo==='entregado' && p.total-pagado(id)>0.009 && !confirm('Este pedido tiene saldo pendiente de '+money(p.total-pagado(id))+'. ¿Marcar como entregado igual?')) return;
+  p.estado=nuevo; (p.historial=p.historial||[]).push({fecha:today(),estado:nuevo});
+  save(); route(); verPedido(id);
+}
+function registrarPago(pid){
+  const p=byId(db.pedidos,pid); const saldo=p.total-pagado(pid);
+  const sugerido = pagado(pid)===0 ? p.total*db.config.adelantoPct/100 : saldo;
+  openDlg('Registrar pago · '+p.numero, `<div class="form" id="fp">
+    <div><label>Monto (saldo ${money(saldo)})</label><input type="number" step="0.01" name="monto" value="${sugerido.toFixed(2)}"></div>
+    <div><label>Método</label><select name="metodo">${METODOS.map(m=>`<option>${m}</option>`).join('')}</select></div>
+    <div><label>Fecha</label><input type="date" name="fecha" value="${today()}"></div>
+    <div><label>Concepto</label><input name="concepto" value="${pagado(pid)===0?'Adelanto':'Pago de saldo'}"></div></div>`,
+    `<button onclick="verPedido('${pid}')">Volver</button><button class="primary" onclick="guardarPago('${pid}')">Guardar pago</button>`);
+}
+function guardarPago(pid){
+  const d=formData('#fp'); if(!(+d.monto>0)) return toast('Monto inválido');
+  db.movimientos.push({id:uid(), tipo:'ingreso', pedidoId:pid, fecha:d.fecha, monto:+d.monto, metodo:d.metodo, concepto:d.concepto+' '+byId(db.pedidos,pid).numero, categoria:'Venta'});
+  save(); toast('Pago registrado'); route(); verPedido(pid);
+}
+
+/* ============ INVENTARIO ============ */
+const nombreInv = i => i.tipo==='prenda' ? `${i.nombre} ${i.color||''} ${i.talla||''}`.replace(/\s+/g,' ').trim() : i.nombre;
+function inventario(){
+  const tab = window._invTab||'prenda';
+  const list = db.inventario.filter(i=>i.tipo===tab);
+  $('#view').innerHTML = `<h1>Inventario</h1>
+  <div class="bar"><button class="${tab==='prenda'?'primary':''}" onclick="window._invTab='prenda';inventario()">👕 Prendas</button><button class="${tab==='insumo'?'primary':''}" onclick="window._invTab='insumo';inventario()">🎨 Insumos</button><span class="grow"></span><button class="primary" onclick="editInv(null,'${tab}')">+ Nuevo ${tab==='prenda'?'prenda':'insumo'}</button></div>
+  <div class="card tablewrap">${list.length?`<table><tr><th>${tab==='prenda'?'Prenda':'Insumo'}</th>${tab==='prenda'?'<th>Color</th><th>Talla</th>':'<th>Categoría</th>'}<th class="n">Stock</th><th class="n">Mínimo</th><th class="n">Costo</th>${tab==='prenda'?'<th class="n">P. venta</th>':''}<th class="n">Valorizado</th><th></th></tr>
+  ${list.map(i=>`<tr><td><b>${esc(i.nombre)}</b></td>${tab==='prenda'?`<td>${esc(i.color)}</td><td>${esc(i.talla)}</td>`:`<td>${esc(i.categoria||'')}</td>`}
+  <td class="n" style="color:${+i.stock<=+i.minimo?'var(--bad)':'inherit'}"><b>${i.stock}</b> ${esc(i.unidad)}</td><td class="n">${i.minimo}</td><td class="n">${money(i.costo)}</td>${tab==='prenda'?`<td class="n">${money(i.precioVenta)}</td>`:''}<td class="n">${money(i.stock*i.costo)}</td>
+  <td class="n"><button class="sm" onclick="ajusteInv('${i.id}')">± Stock</button> <button class="sm" onclick="editInv('${i.id}')">Editar</button></td></tr>`).join('')}
+  <tr><td colspan="${tab==='prenda'?7:5}" class="n muted">Total valorizado</td><td class="n"><b>${money(list.reduce((a,i)=>a+i.stock*i.costo,0))}</b></td><td></td></tr></table>`:'<div class="empty">Sin registros</div>'}</div>`;
+}
+function editInv(id,tipo){
+  const i = id? byId(db.inventario,id) : {tipo, nombre:'', color:'', talla:'', categoria:'Tinta', unidad: tipo==='prenda'?'und':'kg', stock:0, minimo:0, costo:0, precioVenta:0};
+  const pr = i.tipo==='prenda';
+  openDlg(id?'Editar ítem':'Nuevo ítem', `<div class="form" id="fi">
+    <div class="full"><label>Nombre *</label><input name="nombre" value="${esc(i.nombre)}" placeholder="${pr?'Polo algodón 20/1':'Tinta plastisol blanca'}"></div>
+    ${pr?`<div><label>Color</label><input name="color" value="${esc(i.color)}"></div><div><label>Talla</label><select name="talla">${['','XS','S','M','L','XL','XXL','Niño 4','Niño 8','Niño 12','Única'].map(t=>`<option ${t===i.talla?'selected':''}>${t}</option>`).join('')}</select></div>`
+       :`<div><label>Categoría</label><select name="categoria">${['Tinta','Emulsión','Malla / marco','Químicos','Film / papel','Otros'].map(t=>`<option ${t===i.categoria?'selected':''}>${t}</option>`).join('')}</select></div>`}
+    <div><label>Unidad</label><input name="unidad" value="${esc(i.unidad)}"></div>
+    <div><label>Stock actual</label><input type="number" step="0.01" name="stock" value="${i.stock}"></div>
+    <div><label>Stock mínimo (alerta)</label><input type="number" step="0.01" name="minimo" value="${i.minimo}"></div>
+    <div><label>Costo unitario S/</label><input type="number" step="0.01" name="costo" value="${i.costo}"></div>
+    ${pr?`<div><label>Precio venta prenda S/</label><input type="number" step="0.01" name="precioVenta" value="${i.precioVenta||0}"></div>`:''}</div>`,
+    `${id?`<button class="danger" onclick="delInv('${id}')">Eliminar</button>`:''}<button onclick="closeDlg()">Cancelar</button><button class="primary" onclick="saveInv('${id||''}','${i.tipo}')">Guardar</button>`);
+}
+function saveInv(id,tipo){
+  const d=formData('#fi'); if(!d.nombre.trim()) return toast('El nombre es obligatorio');
+  ['stock','minimo','costo','precioVenta'].forEach(k=>{ if(k in d) d[k]=+d[k]||0; });
+  if(id) Object.assign(byId(db.inventario,id),d); else db.inventario.push({id:uid(),tipo,...d});
+  save(); closeDlg(); toast('Guardado'); route();
+}
+function delInv(id){ if(!confirm('¿Eliminar ítem?')) return; db.inventario=db.inventario.filter(i=>i.id!==id); save(); closeDlg(); route(); }
+function ajusteInv(id){
+  const i=byId(db.inventario,id);
+  openDlg('Movimiento de stock · '+nombreInv(i), `<div class="form" id="fa">
+    <div><label>Tipo</label><select name="tipo"><option value="entrada">Entrada (compra)</option><option value="salida">Salida (consumo / merma)</option></select></div>
+    <div><label>Cantidad (${esc(i.unidad)})</label><input type="number" step="0.01" name="cant" value="1"></div>
+    <div><label>Costo total de la compra S/ (opcional, se registra como gasto en caja)</label><input type="number" step="0.01" name="costo" value=""></div>
+    <div><label>Método de pago</label><select name="metodo">${METODOS.map(m=>`<option>${m}</option>`).join('')}</select></div></div>`,
+    `<button onclick="closeDlg()">Cancelar</button><button class="primary" onclick="guardarAjuste('${id}')">Aplicar</button>`);
+}
+function guardarAjuste(id){
+  const i=byId(db.inventario,id), d=formData('#fa'), n=+d.cant||0; if(!n) return toast('Cantidad inválida');
+  i.stock = +i.stock + (d.tipo==='entrada'? n : -n);
+  if(d.tipo==='entrada' && +d.costo>0){
+    db.movimientos.push({id:uid(), tipo:'egreso', fecha:today(), monto:+d.costo, metodo:d.metodo, concepto:`Compra ${n} ${i.unidad} ${nombreInv(i)}`, categoria:'Insumos / prendas'});
+    i.costo = +(d.costo/n).toFixed(2);
+  }
+  save(); closeDlg(); toast('Stock actualizado'); route();
+}
+
+/* ============ CAJA ============ */
+function caja(){
+  const mes = window._mes || today().slice(0,7);
+  const movs = db.movimientos.filter(m=>m.fecha.startsWith(mes)).sort((a,b)=>b.fecha.localeCompare(a.fecha));
+  const ing = movs.filter(m=>m.tipo==='ingreso').reduce((a,m)=>a+ +m.monto,0);
+  const egr = movs.filter(m=>m.tipo==='egreso').reduce((a,m)=>a+ +m.monto,0);
+  const porMetodo = METODOS.map(m=>[m, movs.filter(x=>x.tipo==='ingreso'&&x.metodo===m).reduce((a,x)=>a+ +x.monto,0)]).filter(x=>x[1]);
+  const deudas = db.pedidos.map(p=>({p,s:p.total-pagado(p.id)})).filter(x=>x.s>0.009);
+  $('#view').innerHTML = `<h1>Caja y pagos</h1>
+  <div class="bar"><input type="month" value="${mes}" style="width:auto" onchange="window._mes=this.value;caja()"><span class="grow"></span><button onclick="nuevoMov('egreso')">− Registrar gasto</button><button onclick="nuevoMov('ingreso')">+ Otro ingreso</button></div>
+  <div class="grid kpis">
+    <div class="card kpi"><div class="l">Ingresos</div><div class="v" style="color:var(--ok)">${money(ing)}</div></div>
+    <div class="card kpi"><div class="l">Gastos</div><div class="v" style="color:var(--bad)">${money(egr)}</div></div>
+    <div class="card kpi"><div class="l">Resultado</div><div class="v">${money(ing-egr)}</div></div>
+    <div class="card kpi"><div class="l">Por cobrar (total)</div><div class="v">${money(deudas.reduce((a,x)=>a+x.s,0))}</div></div>
+  </div>
+  <div class="grid two">
+  <div class="card"><h2>Ingresos por método</h2>${porMetodo.length?`<table>${porMetodo.map(([m,v])=>`<tr><td>${m}</td><td class="n">${money(v)}</td></tr>`).join('')}</table>`:'<div class="empty">Sin ingresos este mes</div>'}</div>
+  <div class="card"><h2>Saldos pendientes</h2>${deudas.length?`<table>${deudas.map(x=>`<tr style="cursor:pointer" onclick="verPedido('${x.p.id}')"><td>${esc(x.p.numero)}</td><td>${esc(cliente(x.p.clienteId).nombre)}</td><td class="n" style="color:var(--bad)">${money(x.s)}</td></tr>`).join('')}</table>`:'<div class="empty">Nada pendiente 🎉</div>'}</div>
+  </div>
+  <div class="card tablewrap"><h2>Movimientos del mes</h2>${movs.length?`<table><tr><th>Fecha</th><th>Tipo</th><th>Concepto</th><th>Categoría</th><th>Método</th><th class="n">Monto</th><th></th></tr>
+  ${movs.map(m=>`<tr><td>${fmtDate(m.fecha)}</td><td><span class="chip ${m.tipo==='ingreso'?'ok':'bad'}">${m.tipo}</span></td><td>${esc(m.concepto)}</td><td>${esc(m.categoria||'')}</td><td>${esc(m.metodo)}</td><td class="n">${m.tipo==='egreso'?'− ':''}${money(m.monto)}</td><td class="n"><button class="sm danger" onclick="delMov('${m.id}')">✕</button></td></tr>`).join('')}</table>`:'<div class="empty">Sin movimientos</div>'}</div>`;
+}
+function nuevoMov(tipo){
+  const cats = tipo==='egreso'? ['Insumos / prendas','Alquiler','Servicios (luz, agua, internet)','Sueldos','Transporte','Mantenimiento','Otros'] : ['Venta','Otros'];
+  openDlg(tipo==='egreso'?'Registrar gasto':'Registrar ingreso', `<div class="form" id="fm">
+    <div class="full"><label>Concepto *</label><input name="concepto"></div>
+    <div><label>Categoría</label><select name="categoria">${cats.map(c=>`<option>${c}</option>`).join('')}</select></div>
+    <div><label>Monto S/</label><input type="number" step="0.01" name="monto"></div>
+    <div><label>Método</label><select name="metodo">${METODOS.map(m=>`<option>${m}</option>`).join('')}</select></div>
+    <div><label>Fecha</label><input type="date" name="fecha" value="${today()}"></div></div>`,
+    `<button onclick="closeDlg()">Cancelar</button><button class="primary" onclick="guardarMov('${tipo}')">Guardar</button>`);
+}
+function guardarMov(tipo){ const d=formData('#fm'); if(!d.concepto.trim()||!(+d.monto>0)) return toast('Completa concepto y monto'); db.movimientos.push({id:uid(),tipo,...d,monto:+d.monto}); save(); closeDlg(); route(); }
+function delMov(id){ if(!confirm('¿Eliminar movimiento?')) return; db.movimientos=db.movimientos.filter(m=>m.id!==id); save(); route(); }
+
+/* ============ CONFIGURACIÓN ============ */
+function config(){
+  const c=db.config;
+  $('#view').innerHTML = `<h1>Configuración</h1>
+  <div class="card"><h2>Datos de la empresa</h2><div class="form" id="fe">
+    <div><label>Nombre comercial</label><input name="empresa" value="${esc(c.empresa)}"></div>
+    <div><label>RUC</label><input name="ruc" value="${esc(c.ruc)}"></div>
+    <div><label>Teléfono</label><input name="telefono" value="${esc(c.telefono)}"></div>
+    <div><label>Dirección</label><input name="direccion" value="${esc(c.direccion)}"></div></div></div>
+  <div class="card"><h2>Precios de serigrafía</h2><p class="muted">Estos valores son de ejemplo: ajústalos a los costos reales del taller.</p><div class="form" id="fpr">
+    <div><label>Costo por pantalla (por color y ubicación, cobro único) S/</label><input type="number" step="0.1" name="costoPantalla" value="${c.costoPantalla}"></div>
+    <div><label>Costo de estampado por color, por ubicación y por prenda S/</label><input type="number" step="0.1" name="costoColorPrenda" value="${c.costoColorPrenda}"></div>
+    <div><label>Adelanto requerido %</label><input type="number" name="adelantoPct" value="${c.adelantoPct}"></div>
+    <div><label>Validez de la cotización (días)</label><input type="number" name="validezDias" value="${c.validezDias}"></div>
+    <div><label><input type="checkbox" name="aplicarIGV" style="width:auto" ${c.aplicarIGV?'checked':''}> Aplicar IGV</label><input type="number" name="igv" value="${c.igv}"></div>
+    <div class="full"><label>Descuentos por volumen (cantidad mínima:porcentaje, separados por coma)</label><input name="descuentos" value="${c.descuentos.map(d=>d.min+':'+d.pct).join(', ')}"></div></div>
+    <div style="margin-top:12px"><button class="primary" onclick="guardarConfig()">Guardar configuración</button></div></div>
+  <div class="card"><h2>Respaldo de datos</h2><p class="muted">Los datos se guardan en este navegador. Descarga un respaldo cada cierto tiempo, o úsalo para pasar la información a otra computadora.</p>
+    <div class="bar"><button onclick="exportar()">⬇ Descargar respaldo (JSON)</button><label class="btn" style="margin:0;color:var(--text);font-size:14px">⬆ Restaurar respaldo<input type="file" accept=".json" style="display:none" onchange="importar(this.files[0])"></label>
+    <button onclick="cargarDemo()">Cargar datos de ejemplo</button><button class="danger" onclick="borrarTodo()">Borrar todos los datos</button></div></div>`;
+}
+function guardarConfig(){
+  const e=formData('#fe'), p=formData('#fpr');
+  const desc = p.descuentos.split(',').map(s=>s.split(':').map(Number)).filter(x=>x.length===2&&!isNaN(x[0])&&!isNaN(x[1])).map(([min,pct])=>({min,pct}));
+  Object.assign(db.config, e, {costoPantalla:+p.costoPantalla, costoColorPrenda:+p.costoColorPrenda, adelantoPct:+p.adelantoPct, validezDias:+p.validezDias, aplicarIGV:p.aplicarIGV, igv:+p.igv, descuentos:desc});
+  save(); toast('Configuración guardada'); route();
+}
+function exportar(){ const b=new Blob([JSON.stringify(db,null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='pazprints-respaldo-'+today()+'.json'; a.click(); }
+function importar(f){ if(!f) return; const r=new FileReader(); r.onload=()=>{ try{ const d=JSON.parse(r.result); if(!d.clientes||!d.pedidos) throw 0; if(!confirm('Esto reemplazará los datos actuales. ¿Continuar?')) return; db=d; load2(); save(); toast('Respaldo restaurado'); route(); }catch(e){ toast('Archivo inválido'); } }; r.readAsText(f); }
+function load2(){ db.config=Object.assign(defaultConfig(),db.config||{}); db.seq=db.seq||{cot:0,ped:0}; ['clientes','inventario','cotizaciones','pedidos','movimientos'].forEach(k=>db[k]=db[k]||[]); }
+function borrarTodo(){ if(!confirm('¿Borrar TODOS los datos? Esta acción no se puede deshacer.')) return; localStorage.removeItem(KEY); load(); save(); toast('Datos borrados'); location.hash='inicio'; route(); }
+
+/* ============ Datos de ejemplo ============ */
+function cargarDemo(){
+  if((db.clientes.length||db.pedidos.length) && !confirm('Se agregarán datos de ejemplo a los existentes. ¿Continuar?')) return;
+  const C = n=>({id:uid(),...n,creado:today()});
+  const cl=[C({nombre:'Colegio San Martín',doc:'20481234567',telefono:'987 654 321',email:'compras@sanmartin.edu.pe',direccion:'Av. Los Olivos 123',notas:'Polos de promoción cada año'}),
+            C({nombre:'Gimnasio FitZone',doc:'20567891234',telefono:'912 345 678',email:'',direccion:'',notas:''}),
+            C({nombre:'María Quispe',doc:'45678912',telefono:'955 111 222',email:'',direccion:'',notas:'Emprendedora, ropa urbana'})];
+  db.clientes.push(...cl);
+  const I = n=>({id:uid(),...n});
+  const inv=[I({tipo:'prenda',nombre:'Polo algodón 20/1',color:'Blanco',talla:'M',unidad:'und',stock:120,minimo:30,costo:9,precioVenta:15}),
+    I({tipo:'prenda',nombre:'Polo algodón 20/1',color:'Negro',talla:'L',unidad:'und',stock:25,minimo:30,costo:10,precioVenta:16}),
+    I({tipo:'prenda',nombre:'Polera con capucha',color:'Gris',talla:'L',unidad:'und',stock:40,minimo:10,costo:28,precioVenta:42}),
+    I({tipo:'insumo',nombre:'Tinta plastisol blanca',categoria:'Tinta',unidad:'kg',stock:4,minimo:2,costo:45}),
+    I({tipo:'insumo',nombre:'Tinta base agua negra',categoria:'Tinta',unidad:'kg',stock:1,minimo:2,costo:38}),
+    I({tipo:'insumo',nombre:'Emulsión fotosensible',categoria:'Emulsión',unidad:'L',stock:2,minimo:1,costo:85}),
+    I({tipo:'insumo',nombre:'Marco aluminio malla 120',categoria:'Malla / marco',unidad:'und',stock:8,minimo:4,costo:60})];
+  db.inventario.push(...inv);
+  const mkCot=(cli,items,estado,dias)=>{ db.seq.cot++; const q={id:uid(),numero:'COT-'+String(db.seq.cot).padStart(4,'0'),fecha:addDays(today(),-dias),clienteId:cli.id,items,estado,notas:''}; q.total=calcDoc(items).total; db.cotizaciones.push(q); return q; };
+  const mkPed=(q,estado,entrega,pagos)=>{ db.seq.ped++; const p={id:uid(),numero:'PED-'+String(db.seq.ped).padStart(4,'0'),cotizacionId:q.id,clienteId:q.clienteId,fecha:q.fecha,fechaEntrega:addDays(today(),entrega),items:JSON.parse(JSON.stringify(q.items)),total:q.total,estado,notas:'',stockDescontado:['estampado','listo','entregado'].includes(estado),historial:[{fecha:q.fecha,estado:'pendiente'}]};
+    if(estado!=='pendiente') p.historial.push({fecha:today(),estado}); db.pedidos.push(p); q.pedidoId=p.id; q.estado='aprobada';
+    pagos.forEach(([m,met])=>db.movimientos.push({id:uid(),tipo:'ingreso',pedidoId:p.id,fecha:addDays(today(),-1),monto:m,metodo:met,concepto:'Pago '+p.numero,categoria:'Venta'})); return p; };
+  const it=(p,cant,col,ub)=>({descripcion:nombreInv(p),prendaId:p.id,cantidad:cant,colores:col,ubicaciones:ub,precioPrenda:p.precioVenta,precioManual:''});
+  const q1=mkCot(cl[0],[it(inv[0],100,2,1)],'aprobada',6); const p1=mkPed(q1,'estampado',2,[[q1.total/2,'Transferencia']]);
+  const q2=mkCot(cl[1],[it(inv[1],30,1,2),it(inv[2],10,1,1)],'aprobada',4); mkPed(q2,'diseno',-1,[[200,'Yape']]);
+  const q3=mkCot(cl[2],[{descripcion:'Polos de la clienta (ella trae la prenda)',prendaId:'',cantidad:24,colores:3,ubicaciones:1,precioPrenda:0,precioManual:''}],'aprobada',8); mkPed(q3,'listo',0,[[q3.total,'Plin']]);
+  mkCot(cl[0],[it(inv[2],50,1,2)],'enviada',1);
+  if(p1.stockDescontado) inv[0].stock -= 100;
+  db.movimientos.push({id:uid(),tipo:'egreso',fecha:today(),monto:180,metodo:'Efectivo',concepto:'Compra tintas plastisol',categoria:'Insumos / prendas'},
+                      {id:uid(),tipo:'egreso',fecha:today(),monto:1200,metodo:'Transferencia',concepto:'Alquiler del taller',categoria:'Alquiler'});
+  save(); toast('Datos de ejemplo cargados'); route();
+}
+
+load(); route();
+</script>
+</body>
+</html>

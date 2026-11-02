@@ -1,0 +1,47 @@
+name: Publicar prototipo en GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths: ["app/**", ".github/workflows/pages.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  validar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validar que el JavaScript del prototipo compila
+        run: |
+          node -e '
+            const fs = require("fs");
+            const html = fs.readFileSync("app/index.html", "utf8");
+            const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m => m[1]);
+            if (!scripts.length) throw new Error("No se encontró <script> en app/index.html");
+            scripts.forEach(s => new Function(s));
+            console.log("OK:", scripts.length, "bloque(s) de script válidos");
+          '
+
+  deploy:
+    needs: validar
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: app
+      - id: deployment
+        uses: actions/deploy-pages@v4
