@@ -73,7 +73,8 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 .totals{margin-left:auto;max-width:320px}
 .totals div{display:flex;justify-content:space-between;padding:3px 0}
 .totals .t{font-weight:700;font-size:16px;border-top:1px solid var(--line);margin-top:4px;padding-top:6px}
-dialog.wide{max-width:1060px}
+dialog.wide{max-width:1000px}
+select.mini{margin-top:4px;font-size:12px;padding:4px 6px;color:var(--muted)}
 button.wa{background:#25d366;border-color:#25d366;color:#fff}
 button.wa:hover{background:#1da851;border-color:#1da851}
 button.link{border:none;background:none;color:var(--brand);padding:4px 0;text-decoration:underline;cursor:pointer}
@@ -131,16 +132,33 @@ const ESTADOS = [
 const METODOS = ['Efectivo','Yape','Plin','Transferencia','Tarjeta'];
 const defaultConfig = () => ({
   empresa:'PazPrints', ruc:'', telefono:'', direccion:'',
-  costoPantalla:35,          // por cada pantalla (color × ubicación), cobro único por pedido
-  costoColorPrenda:1.5,      // por color, por ubicación, por prenda
-  descuentos:[{min:50,pct:5},{min:100,pct:10},{min:300,pct:15}],
-  aplicarIGV:false, igv:18, validezDias:7, adelantoPct:50
+  aplicarIGV:false, igv:18, adelantoPct:50
 });
 let db;
 function load(){
   try{ db = JSON.parse(localStorage.getItem(KEY)); }catch(e){ db = null; }
   if(!db){ db = {config:defaultConfig(), clientes:[], inventario:[], cotizaciones:[], pedidos:[], movimientos:[], seq:{cot:0,ped:0}}; }
-  db.config = Object.assign(defaultConfig(), db.config||{});
+  load2();
+}
+// Convierte cotizaciones/pedidos del formato anterior (colores, ubicaciones, pantallas) a precio por unidad con todo incluido
+function migrar(){
+  db.clientesEliminados = db.clientesEliminados || {};
+  const c = db.config;
+  const fixDoc = items => {
+    const qty = items.reduce((a,it)=>a+(+it.cantidad||0),0);
+    const d = (c.descuentos||[]).slice().sort((a,b)=>b.min-a.min).find(d=>qty>=d.min);
+    const factor = 1 - (d ? d.pct : 0)/100;   // el antiguo descuento por volumen queda dentro del precio
+    items.forEach(it=>{
+      if(it.precio==null){
+        const pant=(+it.colores||0)*(+it.ubicaciones||0), man=it.precioManual!=='' && it.precioManual!=null, cant=+it.cantidad||1;
+        const pu = man ? +it.precioManual : (+it.precioPrenda||0) + pant*(c.costoColorPrenda??1.5) + pant*(c.costoPantalla??35)/cant;
+        it.precio = +(pu*factor).toFixed(4);
+      }
+      ['colores','ubicaciones','precioPrenda','precioManual'].forEach(k=>delete it[k]);
+    });
+  };
+  db.cotizaciones.forEach(q=>{ fixDoc(q.items); if(!q.fechaInicio) q.fechaInicio=q.fecha; });
+  db.pedidos.forEach(p=>{ fixDoc(p.items); if(!p.fechaInicio) p.fechaInicio=p.fecha; });
 }
 function save(){ try{ localStorage.setItem(KEY, JSON.stringify(db)); }catch(e){ toast('No se pudo guardar en el navegador'); } }
 const uid = () => Math.random().toString(36).slice(2,10)+Date.now().toString(36).slice(-4);
@@ -150,29 +168,17 @@ const money = n => 'S/ ' + (Number(n)||0).toLocaleString('es-PE',{minimumFractio
 const esc = s => String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmtDate = d => d ? new Date(d+'T00:00:00').toLocaleDateString('es-PE',{day:'2-digit',month:'short',year:'numeric'}) : '—';
 const byId = (arr,id) => arr.find(x=>x.id===id);
-const cliente = id => byId(db.clientes,id) || {nombre:'(sin cliente)'};
+const cliente = id => byId(db.clientes,id) || (db.clientesEliminados||{})[id] || {nombre:'(sin cliente)'};
 const $ = s => document.querySelector(s);
 function toast(m){ const t=$('#toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('show'),2200); }
 
 /* ============ Cálculo de precios ============ */
-function calcItem(it){
-  const c = db.config;
-  const pantallas = (+it.colores||0) * (+it.ubicaciones||0);
-  const unit = (+it.precioPrenda||0) + pantallas * c.costoColorPrenda;
-  const setup = pantallas * c.costoPantalla;
-  const precioUnit = it.precioManual !== '' && it.precioManual != null ? +it.precioManual : unit;
-  return {pantallas, precioUnit, setup: it.precioManual !== '' && it.precioManual != null ? 0 : setup, total: precioUnit*(+it.cantidad||0) + (it.precioManual !== '' && it.precioManual != null ? 0 : setup)};
-}
+function calcItem(it){ const pu=+it.precio||0; return {precioUnit:pu, total:pu*(+it.cantidad||0)}; }
 function calcDoc(items){
-  const c = db.config;
-  let sub=0, qty=0;
+  const c = db.config; let sub=0, qty=0;
   items.forEach(it=>{ sub += calcItem(it).total; qty += +it.cantidad||0; });
-  const d = [...c.descuentos].sort((a,b)=>b.min-a.min).find(d=>qty>=d.min);
-  const pct = d ? d.pct : 0;
-  const desc = sub*pct/100;
-  const base = sub-desc;
-  const igv = c.aplicarIGV ? base*c.igv/100 : 0;
-  return {qty, sub, pct, desc, igv, total: base+igv};
+  const igv = c.aplicarIGV ? sub*c.igv/100 : 0;
+  return {qty, sub, igv, total: sub+igv};
 }
 const pagado = pid => db.movimientos.filter(m=>m.pedidoId===pid && m.tipo==='ingreso').reduce((a,m)=>a+ +m.monto,0);
 
@@ -234,7 +240,7 @@ function clientes(){
   <div class="card tablewrap">${list.length?`<table><tr><th>Nombre</th><th>DNI/RUC</th><th>Teléfono</th><th>Email</th><th class="n">Pedidos</th><th class="n">Deuda</th><th></th></tr>
   ${list.map(c=>{ const peds=db.pedidos.filter(p=>p.clienteId===c.id); const deuda=peds.reduce((a,p)=>a+Math.max(0,p.total-pagado(p.id)),0);
     return `<tr><td><b>${esc(c.nombre)}</b>${c.notas?`<div class="muted">${esc(c.notas)}</div>`:''}</td><td>${esc(c.doc)}</td><td>${esc(c.telefono)}</td><td>${esc(c.email)}</td><td class="n">${peds.length}</td><td class="n" style="color:${deuda?'var(--bad)':'inherit'}">${money(deuda)}</td>
-    <td class="n"><button class="sm" onclick="editCliente('${c.id}')">Editar</button> <button class="sm" onclick="nuevaCotizacion('${c.id}')">Cotizar</button></td></tr>`}).join('')}</table>`:'<div class="empty">No hay clientes registrados</div>'}</div>`;
+    <td class="n"><button class="sm" onclick="editCliente('${c.id}')">Editar</button> <button class="sm" onclick="nuevaCotizacion('${c.id}')">Cotizar</button> <button class="sm danger" title="Eliminar" onclick="delCliente('${c.id}')">🗑</button></td></tr>`}).join('')}</table>`:'<div class="empty">No hay clientes registrados</div>'}</div>`;
 }
 function editCliente(id){
   const c = id? byId(db.clientes,id) : {nombre:'',doc:'',telefono:'',email:'',direccion:'',notas:''};
@@ -245,14 +251,20 @@ function editCliente(id){
     <div><label>Email</label><input name="email" value="${esc(c.email)}"></div>
     <div class="full"><label>Dirección</label><input name="direccion" value="${esc(c.direccion)}"></div>
     <div class="full"><label>Notas</label><textarea name="notas">${esc(c.notas)}</textarea></div></div>`,
-    `${id && !db.pedidos.some(p=>p.clienteId===id) && !db.cotizaciones.some(q=>q.clienteId===id)?`<button class="danger" onclick="delCliente('${id}')">Eliminar</button>`:''}<button onclick="closeDlg()">Cancelar</button><button class="primary" onclick="saveCliente('${id||''}')">Guardar</button>`);
+    `${id?`<button class="danger" style="margin-right:auto" onclick="delCliente('${id}')">🗑 Eliminar</button>`:''}<button onclick="closeDlg()">Cancelar</button><button class="primary" onclick="saveCliente('${id||''}')">Guardar</button>`);
 }
 function saveCliente(id){
   const d = formData('#fc'); if(!d.nombre.trim()) return toast('El nombre es obligatorio');
   if(id) Object.assign(byId(db.clientes,id), d); else db.clientes.push({id:uid(), ...d, creado:today()});
   save(); closeDlg(); toast('Cliente guardado'); route();
 }
-function delCliente(id){ if(!confirm('¿Eliminar este cliente?')) return; db.clientes=db.clientes.filter(c=>c.id!==id); save(); closeDlg(); route(); }
+function delCliente(id){
+  const c=byId(db.clientes,id), nq=db.cotizaciones.filter(q=>q.clienteId===id).length, np=db.pedidos.filter(p=>p.clienteId===id).length;
+  if(!confirm(`¿Eliminar al cliente ${c.nombre}?` + (nq||np ? `\n\nSus ${nq} ${plural(nq,'cotización','cotizaciones')} y ${np} ${plural(np,'pedido','pedidos')} NO se borran: seguirán apareciendo con su nombre.` : ''))) return;
+  if(nq||np) db.clientesEliminados[id] = {id, nombre:c.nombre, telefono:c.telefono, doc:c.doc, eliminado:true};
+  db.clientes = db.clientes.filter(x=>x.id!==id);
+  save(); if($('#dlg').open) closeDlg(); toast('Cliente eliminado'); route();
+}
 
 /* ============ WHATSAPP ============ */
 function telWA(t){ let d=String(t||'').replace(/\D/g,''); if(d.length===9 && d[0]==='9') d='51'+d; return d; }
@@ -275,14 +287,13 @@ function msgCotizacion(q){
   const c=cliente(q.clienteId), t=calcDoc(q.items), cf=db.config, L=[];
   L.push(`Hola ${c.nombre} 👋, te saluda ${cf.empresa}.`);
   L.push(`Te enviamos la cotización *${q.numero}*:`, '');
-  q.items.forEach(it=>{ const x=calcItem(it); L.push(`• ${it.cantidad} × ${it.descripcion} (${it.colores} ${plural(it.colores,'color','colores')}, ${it.ubicaciones} ${plural(it.ubicaciones,'ubicación','ubicaciones')}): ${money(x.total)}`); });
+  q.items.forEach(it=>L.push(`• ${it.cantidad} × ${it.descripcion}: ${money(calcItem(it).total)} (${money(it.precio)} c/u)`));
   L.push('');
-  if(t.pct) L.push(`Descuento por volumen (${t.pct}%): −${money(t.desc)}`);
-  if(cf.aplicarIGV) L.push(`IGV (${cf.igv}%): ${money(t.igv)}`);
-  L.push(`*Total: ${money(t.total)}*`);
+  if(cf.aplicarIGV) L.push(`Subtotal: ${money(t.sub)}`, `IGV (${cf.igv}%): ${money(t.igv)}`);
+  L.push(`*Total: ${money(t.total)}* (servicio completo)`);
   L.push(`Adelanto para empezar (${cf.adelantoPct}%): ${money(t.total*cf.adelantoPct/100)}`);
-  if(q.fechaEntrega) L.push(`Entrega estimada: ${fmtDate(q.fechaEntrega)}`);
-  L.push(`Cotización válida hasta: ${fmtDate(addDays(q.fecha,cf.validezDias))}`);
+  if(q.fechaInicio) L.push(`Fecha de inicio: ${fmtDate(q.fechaInicio)}`);
+  if(q.fechaEntrega) L.push(`Fecha de entrega: ${fmtDate(q.fechaEntrega)}`);
   if(q.notas) L.push('', q.notas);
   L.push('', '¿Te parece bien para empezar? Quedamos atentos 🙌');
   return L.join('\n');
@@ -320,72 +331,67 @@ function cotizaciones(){
   <td class="n" style="white-space:nowrap"><button class="sm" onclick="editCotizacion('${q.id}')">Abrir</button> <button class="sm wa" title="Enviar por WhatsApp" onclick="waCotizacion('${q.id}')">📲</button> <button class="sm" title="Imprimir / PDF" onclick="imprimirCot('${q.id}')">🖨</button> <button class="sm danger" title="Eliminar" onclick="delCot('${q.id}')">🗑</button></td></tr>`}).join('')}</table>`:'<div class="empty">Aún no hay cotizaciones. Presiona <b>+ Nueva cotización</b> para empezar.</div>'}</div>`;
 }
 function nuevaCotizacion(clienteId){
-  window._cot = {id:null, numero:'', fecha:today(), fechaEntrega:addDays(today(),5), clienteId: clienteId||(db.clientes[0]?db.clientes[0].id:''), items:[nuevoItem()], estado:'borrador', notas:'',
+  window._cot = {id:null, numero:'', fecha:today(), fechaInicio:today(), fechaEntrega:addDays(today(),5), clienteId: clienteId||(db.clientes[0]?db.clientes[0].id:''), items:[nuevoItem()], estado:'borrador', notas:'',
                  _nuevo: !db.clientes.length, _nc:{nombre:'',telefono:''}};
   formCotizacion();
 }
-function nuevoItem(){ return {descripcion:'Polo algodón cuello redondo', prendaId:'', cantidad:12, colores:1, ubicaciones:1, precioPrenda:15, precioManual:''}; }
+function nuevoItem(){ return {descripcion:'', prendaId:'', cantidad:'', precio:''}; }
 function editCotizacion(id){ window._cot = Object.assign(JSON.parse(JSON.stringify(byId(db.cotizaciones,id))), {_nuevo:false, _nc:{nombre:'',telefono:''}}); formCotizacion(); }
 function totalsHTML(items){
-  const t = calcDoc(items);
-  return `<div><span>Subtotal (${t.qty} prendas)</span><span>${money(t.sub)}</span></div>
-    ${t.pct?`<div><span>Descuento por volumen (${t.pct}%)</span><span>− ${money(t.desc)}</span></div>`:''}
-    ${db.config.aplicarIGV?`<div><span>IGV (${db.config.igv}%)</span><span>${money(t.igv)}</span></div>`:''}
-    <div class="t"><span>Total</span><span>${money(t.total)}</span></div>
-    <div class="muted"><span>Adelanto (${db.config.adelantoPct}%)</span><span>${money(t.total*db.config.adelantoPct/100)}</span></div>`;
+  const t = calcDoc(items), cf = db.config;
+  return `${cf.aplicarIGV?`<div><span>Subtotal</span><span>${money(t.sub)}</span></div><div><span>IGV (${cf.igv}%)</span><span>${money(t.igv)}</span></div>`:''}
+    <div class="t"><span>Total (${t.qty} ${plural(t.qty,'prenda','prendas')})</span><span>${money(t.total)}</span></div>
+    <div class="muted"><span>Adelanto (${cf.adelantoPct}%)</span><span>${money(t.total*cf.adelantoPct/100)}</span></div>`;
 }
 function filaItem(it,i,ro,prendas,unica){
-  const c=calcItem(it), dis=ro?'disabled':'';
+  const dis = ro?'disabled':'';
   return `<tr>
-    <td><select style="margin-bottom:4px" ${dis} onchange="setPrenda(${i},this.value)"><option value="">Prenda que trae el cliente / sin inventario</option>${prendas.map(p=>`<option value="${p.id}" ${p.id===it.prendaId?'selected':''}>${esc(nombreInv(p))} (stock ${p.stock})</option>`).join('')}</select>
-        <input placeholder="Descripción" value="${esc(it.descripcion)}" ${dis} oninput="setIt(${i},'descripcion',this.value)"></td>
-    <td><input type="number" min="1" style="width:72px" value="${it.cantidad}" ${dis} oninput="setIt(${i},'cantidad',this.value)"></td>
-    <td><input type="number" min="0" max="12" style="width:62px" value="${it.colores}" ${dis} oninput="setIt(${i},'colores',this.value)"></td>
-    <td><input type="number" min="0" max="6" style="width:62px" value="${it.ubicaciones}" ${dis} oninput="setIt(${i},'ubicaciones',this.value)"></td>
-    <td><input type="number" min="0" step="0.1" style="width:82px" value="${it.precioPrenda}" ${dis} oninput="setIt(${i},'precioPrenda',this.value)"></td>
-    <td><input type="number" min="0" step="0.1" style="width:82px" placeholder="auto" value="${it.precioManual}" ${dis} oninput="setIt(${i},'precioManual',this.value)"></td>
-    <td class="n" id="ci-pu-${i}">${money(c.precioUnit)}</td><td class="n" id="ci-pa-${i}">${c.pantallas} · ${money(c.setup)}</td><td class="n" id="ci-tt-${i}"><b>${money(c.total)}</b></td>
+    <td><input placeholder="Ej.: Polo blanco con logo estampado en el pecho" value="${esc(it.descripcion)}" ${dis} oninput="setIt(${i},'descripcion',this.value)">
+      ${prendas.length?`<select class="mini" ${dis} onchange="setPrenda(${i},this.value)"><option value="">Prenda del inventario (opcional, para descontar stock)</option>${prendas.map(p=>`<option value="${p.id}" ${p.id===it.prendaId?'selected':''}>${esc(nombreInv(p))} (stock ${p.stock})</option>`).join('')}</select>`:''}</td>
+    <td><input type="number" min="1" style="width:90px" placeholder="0" value="${it.cantidad}" ${dis} oninput="setIt(${i},'cantidad',this.value)"></td>
+    <td><input type="number" min="0" step="0.1" style="width:110px" placeholder="0.00" value="${it.precio}" ${dis} oninput="setIt(${i},'precio',this.value)"></td>
+    <td class="n" id="ci-tt-${i}"><b>${money(calcItem(it).total)}</b></td>
     <td>${ro||unica?'':`<button class="sm danger" title="Quitar" onclick="window._cot.items.splice(${i},1);formCotizacion()">✕</button>`}</td></tr>`;
 }
 function formCotizacion(){
   const q = window._cot, ro = !!q.pedidoId, dis = ro?'disabled':'';
   const prendas = db.inventario.filter(i=>i.tipo==='prenda');
   const ped = ro && byId(db.pedidos,q.pedidoId);
+  const elim = db.clientesEliminados[q.clienteId];
   openDlg(q.id? `Cotización ${q.numero}`:'Nueva cotización', `
   ${ro ? `<div class="aviso ok">Esta cotización ya fue aprobada y es el pedido <b>${esc(ped?ped.numero:'')}</b>. Aquí solo puedes verla, reenviarla o imprimirla.</div>`
-       : `<div class="aviso">Llena los 3 pasos y al final elige: <b>guardar como borrador</b>, <b>enviarla por WhatsApp</b> o, si el cliente ya aceptó, <b>crear el pedido</b>. No hace falta volver a abrirla.</div>`}
+       : `<div class="aviso">Llena los 3 pasos y al final elige: <b>guardar como borrador</b>, <b>enviarla por WhatsApp</b> o, si el cliente ya aceptó, <b>crear el pedido</b>.</div>`}
   <h2 class="paso"><span>1</span> Cliente y fechas</h2>
   <div class="form">
     <div class="full">${q._nuevo ? `
       <div class="form"><div><label>Nombre del cliente nuevo *</label><input value="${esc(q._nc.nombre)}" oninput="window._cot._nc.nombre=this.value" placeholder="Ej.: Colegio San Martín"></div>
       <div><label>WhatsApp</label><input value="${esc(q._nc.telefono)}" oninput="window._cot._nc.telefono=this.value" placeholder="987 654 321"></div></div>
       ${db.clientes.length?`<button class="link" onclick="window._cot._nuevo=false;formCotizacion()">← Elegir un cliente ya registrado</button>`:''}`
-    : `<label>Cliente</label><select ${dis} onchange="window._cot.clienteId=this.value">${db.clientes.map(c=>`<option value="${c.id}" ${c.id===q.clienteId?'selected':''}>${esc(c.nombre)}${c.telefono?' · '+esc(c.telefono):''}</option>`).join('')}</select>
+    : `<label>Cliente</label><select ${dis} onchange="window._cot.clienteId=this.value">${elim?`<option value="${elim.id}" selected>${esc(elim.nombre)} (eliminado)</option>`:''}${db.clientes.map(c=>`<option value="${c.id}" ${c.id===q.clienteId?'selected':''}>${esc(c.nombre)}${c.telefono?' · '+esc(c.telefono):''}</option>`).join('')}</select>
       ${ro?'':`<button class="link" onclick="window._cot._nuevo=true;formCotizacion()">+ Es un cliente nuevo</button>`}`}</div>
-    <div><label>Fecha de la cotización</label><input type="date" value="${q.fecha}" ${dis} onchange="window._cot.fecha=this.value"></div>
-    <div><label>Fecha de entrega al cliente</label><input type="date" value="${q.fechaEntrega||''}" ${dis} onchange="window._cot.fechaEntrega=this.value"></div>
+    <div><label>Fecha de inicio</label><input type="date" value="${q.fechaInicio||''}" ${dis} onchange="window._cot.fechaInicio=this.value"></div>
+    <div><label>Fecha de entrega</label><input type="date" value="${q.fechaEntrega||''}" ${dis} onchange="window._cot.fechaEntrega=this.value"></div>
     <div><label>Estado</label><div style="padding-top:6px">${chipCot(q.estado)} ${q.id&&!ro?`<button class="link" onclick="toggleRechazo()">${q.estado==='rechazada'?'Reabrir':'Marcar como rechazada'}</button>`:''}</div></div>
   </div>
-  <h2 class="paso"><span>2</span> Prendas y estampado</h2>
-  <div class="tablewrap"><table><tr><th style="min-width:210px">Prenda / descripción</th><th>Cantidad</th><th>N° colores</th><th>Ubicaciones</th><th>Precio prenda S/</th><th>Precio manual</th><th class="n">P. unit.</th><th class="n">Pantallas</th><th class="n">Total</th><th></th></tr>
+  <h2 class="paso"><span>2</span> Servicios</h2>
+  <div class="tablewrap"><table><tr><th style="min-width:280px">Descripción del servicio</th><th>Cantidad</th><th>Precio por unidad S/</th><th class="n">Total</th><th></th></tr>
   ${q.items.map((it,i)=>filaItem(it,i,ro,prendas,q.items.length<2)).join('')}</table></div>
-  ${ro?'':`<button class="sm" style="margin-top:8px" onclick="window._cot.items.push(nuevoItem());formCotizacion()">+ Agregar otra prenda</button>`}
-  <p class="muted" style="font-size:12px"><b>Ubicaciones</b> = lugares estampados (pecho, espalda, manga…). Precio unitario = prenda + (colores × ubicaciones × ${money(db.config.costoColorPrenda)}). Cada pantalla (color × ubicación) suma ${money(db.config.costoPantalla)} una sola vez. Si pones un <b>precio manual</b>, reemplaza el cálculo y no se cobran pantallas aparte.</p>
+  ${ro?'':`<button class="sm" style="margin-top:8px" onclick="window._cot.items.push(nuevoItem());formCotizacion()">+ Agregar otro servicio</button>`}
+  <p class="muted" style="font-size:12px">El precio por unidad incluye todo el servicio (prenda, estampado, pantallas, etc.).</p>
   <h2 class="paso"><span>3</span> Total y notas</h2>
   <div class="totals" id="cotTotals">${totalsHTML(q.items)}</div>
-  <label style="margin-top:10px">Notas para el cliente (aparecen en el mensaje y en la impresión)</label><textarea ${dis} oninput="window._cot.notas=this.value" placeholder="Ej.: Tinta plastisol, diseño enviado por el cliente">${esc(q.notas)}</textarea>`,
+  <label style="margin-top:10px">Notas para el cliente (aparecen en el mensaje y en la impresión)</label><textarea ${dis} oninput="window._cot.notas=this.value" placeholder="Ej.: Diseño enviado por el cliente, tallas S a XL">${esc(q.notas)}</textarea>`,
   ro ? `<button class="danger" style="margin-right:auto" onclick="delCot('${q.id}')">🗑 Eliminar</button><button onclick="closeDlg()">Cerrar</button><button onclick="imprimirCot('${q.id}')">🖨 Imprimir</button><button class="wa" onclick="waCotizacion('${q.id}')">📲 Reenviar por WhatsApp</button>`
      : `${q.id?`<button class="danger" style="margin-right:auto" onclick="delCot('${q.id}')">🗑 Eliminar</button>`:''}<button onclick="closeDlg()">Cancelar</button><button onclick="saveCot()">💾 Guardar borrador</button><button class="wa" onclick="if(saveCot(true)) waCotizacion(window._cot.id)">📲 Guardar y enviar por WhatsApp</button><button class="primary" onclick="aPedido()">✔ El cliente aceptó: crear pedido</button>`);
   document.getElementById('dlg').classList.add('wide');
 }
-function setIt(i,k,v){ window._cot.items[i][k] = (k==='descripcion'||k==='precioManual'||v==='') ? v : +v; refreshCot(); }
+function setIt(i,k,v){ window._cot.items[i][k] = (k==='descripcion'||v==='') ? v : +v; refreshCot(); }
 function refreshCot(){
   if(!$('#cotTotals')) return;
-  window._cot.items.forEach((it,i)=>{ const c=calcItem(it), s=(id,h)=>{ const e=document.getElementById(id); if(e) e.innerHTML=h; };
-    s('ci-pu-'+i, money(c.precioUnit)); s('ci-pa-'+i, `${c.pantallas} · ${money(c.setup)}`); s('ci-tt-'+i, `<b>${money(c.total)}</b>`); });
+  window._cot.items.forEach((it,i)=>{ const e=document.getElementById('ci-tt-'+i); if(e) e.innerHTML=`<b>${money(calcItem(it).total)}</b>`; });
   $('#cotTotals').innerHTML = totalsHTML(window._cot.items);
 }
-function setPrenda(i,pid){ const it=window._cot.items[i]; it.prendaId=pid; const p=byId(db.inventario,pid); if(p){ it.descripcion=nombreInv(p); if(p.precioVenta) it.precioPrenda=+p.precioVenta; } formCotizacion(); }
+function setPrenda(i,pid){ const it=window._cot.items[i]; it.prendaId=pid; const p=byId(db.inventario,pid); if(p && !String(it.descripcion).trim()) it.descripcion=nombreInv(p); formCotizacion(); }
 function validarCot(){
   const q = window._cot;
   if(q._nuevo){
@@ -393,9 +399,11 @@ function validarCot(){
     const c = {id:uid(), nombre:q._nc.nombre.trim(), doc:'', telefono:q._nc.telefono.trim(), email:'', direccion:'', notas:'', creado:today()};
     db.clientes.push(c); q.clienteId=c.id; q._nuevo=false;
   }
-  if(!byId(db.clientes,q.clienteId)){ toast('Elige un cliente (paso 1)'); return false; }
+  if(!byId(db.clientes,q.clienteId) && !db.clientesEliminados[q.clienteId]){ toast('Elige un cliente (paso 1)'); return false; }
+  if(q.fechaInicio && q.fechaEntrega && q.fechaEntrega < q.fechaInicio){ toast('La fecha de entrega no puede ser antes de la fecha de inicio'); return false; }
   if(!q.items.length || q.items.some(it=>!(+it.cantidad>0))){ toast('Revisa las cantidades (paso 2)'); return false; }
-  if(q.items.some(it=>!String(it.descripcion).trim())){ toast('Falta la descripción de alguna prenda (paso 2)'); return false; }
+  if(q.items.some(it=>!String(it.descripcion).trim())){ toast('Falta la descripción de algún servicio (paso 2)'); return false; }
+  if(q.items.some(it=>!(+it.precio>0))){ toast('Falta el precio de algún servicio (paso 2)'); return false; }
   return true;
 }
 function saveCot(silent){
@@ -427,7 +435,7 @@ function aPedido(){
   if(!saveCot(true)) return;
   const q = byId(db.cotizaciones, window._cot.id); q.estado='aprobada';
   db.seq.ped++;
-  const p = {id:uid(), numero:'PED-'+String(db.seq.ped).padStart(4,'0'), cotizacionId:q.id, clienteId:q.clienteId, fecha:today(), fechaEntrega:q.fechaEntrega||addDays(today(),5),
+  const p = {id:uid(), numero:'PED-'+String(db.seq.ped).padStart(4,'0'), cotizacionId:q.id, clienteId:q.clienteId, fecha:today(), fechaInicio:q.fechaInicio||today(), fechaEntrega:q.fechaEntrega||addDays(today(),5),
     items:JSON.parse(JSON.stringify(q.items)), total:q.total, estado:'pendiente', notas:q.notas||'', stockDescontado:false, historial:[{fecha:today(),estado:'pendiente'}]};
   db.pedidos.push(p); q.pedidoId=p.id; save(); closeDlg();
   toast('Pedido '+p.numero+' creado. Si ya pagó el adelanto, regístralo.');
@@ -438,10 +446,10 @@ function imprimirCot(id){
   const w = window.open('','_blank'); if(!w) return toast('Permite ventanas emergentes para imprimir');
   w.document.write(`<html><head><title>${q.numero}</title><style>body{font-family:system-ui;padding:30px;color:#222}table{width:100%;border-collapse:collapse;margin:20px 0}th,td{border-bottom:1px solid #ddd;padding:8px;text-align:left}.n{text-align:right}h1{color:#d6336c;margin:0}</style></head><body>
   <h1>${esc(cf.empresa)}</h1><div>${esc(cf.ruc?'RUC '+cf.ruc:'')} ${esc(cf.telefono)} ${esc(cf.direccion)}</div><hr>
-  <h2>Cotización ${esc(q.numero)}</h2><p>Fecha: ${fmtDate(q.fecha)} · Válida hasta: ${fmtDate(addDays(q.fecha,cf.validezDias))}${q.fechaEntrega?' · Entrega: '+fmtDate(q.fechaEntrega):''}<br>Cliente: <b>${esc(c.nombre)}</b> ${esc(c.doc||'')}</p>
-  <table><tr><th>Descripción</th><th class="n">Cant.</th><th>Estampado</th><th class="n">P. unit.</th><th class="n">Total</th></tr>
-  ${q.items.map(it=>{const x=calcItem(it);return `<tr><td>${esc(it.descripcion)}</td><td class="n">${it.cantidad}</td><td>${it.colores} color(es) × ${it.ubicaciones} ubicación(es)</td><td class="n">${money(x.precioUnit)}</td><td class="n">${money(x.total)}</td></tr>`}).join('')}</table>
-  <p class="n">Subtotal: ${money(t.sub)}<br>${t.pct?`Descuento ${t.pct}%: − ${money(t.desc)}<br>`:''}${cf.aplicarIGV?`IGV ${cf.igv}%: ${money(t.igv)}<br>`:''}<b style="font-size:18px">Total: ${money(t.total)}</b></p>
+  <h2>Cotización ${esc(q.numero)}</h2><p>Cliente: <b>${esc(c.nombre)}</b> ${esc(c.doc||'')}<br>Fecha de inicio: ${fmtDate(q.fechaInicio)} · Fecha de entrega: ${fmtDate(q.fechaEntrega)}</p>
+  <table><tr><th>Descripción del servicio</th><th class="n">Cant.</th><th class="n">P. unit.</th><th class="n">Total</th></tr>
+  ${q.items.map(it=>`<tr><td>${esc(it.descripcion)}</td><td class="n">${it.cantidad}</td><td class="n">${money(it.precio)}</td><td class="n">${money(calcItem(it).total)}</td></tr>`).join('')}</table>
+  <p class="n">${cf.aplicarIGV?`Subtotal: ${money(t.sub)}<br>IGV ${cf.igv}%: ${money(t.igv)}<br>`:''}<b style="font-size:18px">Total: ${money(t.total)}</b></p>
   <p>Adelanto requerido: ${cf.adelantoPct}% (${money(t.total*cf.adelantoPct/100)})</p>${q.notas?`<p>${esc(q.notas)}</p>`:''}
   <script>window.print()<\/script></body></html>`); w.document.close();
 }
@@ -468,12 +476,13 @@ function verPedido(id){
   <div class="form">
     <div><label>Cliente</label><b>${esc(c.nombre)}</b><div class="muted">${esc(c.telefono||'')}</div></div>
     <div><label>Estado</label>${chipEstado(p.estado)}</div>
+    <div><label>Fecha de inicio</label><input type="date" value="${p.fechaInicio||''}" onchange="byId(db.pedidos,'${id}').fechaInicio=this.value;save();route()"></div>
     <div><label>Fecha de entrega</label><input type="date" value="${p.fechaEntrega||''}" onchange="byId(db.pedidos,'${id}').fechaEntrega=this.value;save();route()"></div>
     <div><label>Total / pagado / saldo</label><b>${money(p.total)}</b><div class="muted">${money(pag)} pagado · <span style="color:${saldo>0.009?'var(--bad)':'var(--ok)'}">${money(Math.max(0,saldo))} saldo</span></div></div>
   </div>
-  <h2 style="margin-top:18px">Prendas</h2>
-  <table><tr><th>Descripción</th><th class="n">Cant.</th><th>Estampado</th><th>Inventario</th></tr>
-  ${p.items.map(it=>{ const inv=byId(db.inventario,it.prendaId); return `<tr><td>${esc(it.descripcion)}</td><td class="n">${it.cantidad}</td><td>${it.colores} col × ${it.ubicaciones} ubic.</td><td>${inv?`${esc(nombreInv(inv))} <span class="muted">(stock ${inv.stock})</span>`:'<span class="muted">Prenda del cliente</span>'}</td></tr>`}).join('')}</table>
+  <h2 style="margin-top:18px">Servicios</h2>
+  <table><tr><th>Descripción</th><th class="n">Cant.</th><th class="n">P. unit.</th><th class="n">Total</th><th>Inventario</th></tr>
+  ${p.items.map(it=>{ const inv=byId(db.inventario,it.prendaId); return `<tr><td>${esc(it.descripcion)}</td><td class="n">${it.cantidad}</td><td class="n">${money(it.precio)}</td><td class="n">${money(calcItem(it).total)}</td><td>${inv?`${esc(nombreInv(inv))} <span class="muted">(stock ${inv.stock})</span>`:'<span class="muted">—</span>'}</td></tr>`}).join('')}</table>
   ${['listo','entregado'].includes(p.estado)?`<p>${p.avisadoEl?`<span class="chip ok">Cliente avisado por WhatsApp el ${fmtDate(p.avisadoEl)}</span>`:'<span class="chip warn">Aún no se avisó al cliente</span>'}</p>`:''}
   <p>${p.stockDescontado?'<span class="chip ok">Stock de prendas descontado</span>':'<span class="chip">El stock se descuenta al pasar a "Estampado"</span>'}</p>
   <label>Notas de producción (tintas, Pantone, tallas, etc.)</label><textarea onchange="byId(db.pedidos,'${id}').notas=this.value;save()">${esc(p.notas)}</textarea>
@@ -637,14 +646,11 @@ function config(){
     <div><label>Nombre comercial</label><input name="empresa" value="${esc(c.empresa)}"></div>
     <div><label>RUC</label><input name="ruc" value="${esc(c.ruc)}"></div>
     <div><label>Teléfono</label><input name="telefono" value="${esc(c.telefono)}"></div>
-    <div><label>Dirección</label><input name="direccion" value="${esc(c.direccion)}"></div></div></div>
-  <div class="card"><h2>Precios de serigrafía</h2><p class="muted">Estos valores son de ejemplo: ajústalos a los costos reales del taller.</p><div class="form" id="fpr">
-    <div><label>Costo por pantalla (por color y ubicación, cobro único) S/</label><input type="number" step="0.1" name="costoPantalla" value="${c.costoPantalla}"></div>
-    <div><label>Costo de estampado por color, por ubicación y por prenda S/</label><input type="number" step="0.1" name="costoColorPrenda" value="${c.costoColorPrenda}"></div>
+    <div><label>Dirección</label><input name="direccion" value="${esc(c.direccion)}"></div></div>
+    <div style="margin-top:12px"><button class="primary" onclick="guardarConfig()">Guardar</button></div></div>
+  <div class="card"><h2>Cotizaciones y pagos</h2><div class="form" id="fpr">
     <div><label>Adelanto requerido %</label><input type="number" name="adelantoPct" value="${c.adelantoPct}"></div>
-    <div><label>Validez de la cotización (días)</label><input type="number" name="validezDias" value="${c.validezDias}"></div>
-    <div><label><input type="checkbox" name="aplicarIGV" style="width:auto" ${c.aplicarIGV?'checked':''}> Aplicar IGV</label><input type="number" name="igv" value="${c.igv}"></div>
-    <div class="full"><label>Descuentos por volumen (cantidad mínima:porcentaje, separados por coma)</label><input name="descuentos" value="${c.descuentos.map(d=>d.min+':'+d.pct).join(', ')}"></div></div>
+    <div><label><input type="checkbox" name="aplicarIGV" style="width:auto" ${c.aplicarIGV?'checked':''}> Aplicar IGV (%)</label><input type="number" name="igv" value="${c.igv}"></div></div>
     <div style="margin-top:12px"><button class="primary" onclick="guardarConfig()">Guardar configuración</button></div></div>
   <div class="card"><h2>Respaldo de datos</h2><p class="muted">Los datos se guardan en este navegador. Descarga un respaldo cada cierto tiempo, o úsalo para pasar la información a otra computadora.</p>
     <div class="bar"><button onclick="exportar()">⬇ Descargar respaldo (JSON)</button><label class="btn" style="margin:0;color:var(--text);font-size:14px">⬆ Restaurar respaldo<input type="file" accept=".json" style="display:none" onchange="importar(this.files[0])"></label>
@@ -652,13 +658,12 @@ function config(){
 }
 function guardarConfig(){
   const e=formData('#fe'), p=formData('#fpr');
-  const desc = p.descuentos.split(',').map(s=>s.split(':').map(Number)).filter(x=>x.length===2&&!isNaN(x[0])&&!isNaN(x[1])).map(([min,pct])=>({min,pct}));
-  Object.assign(db.config, e, {costoPantalla:+p.costoPantalla, costoColorPrenda:+p.costoColorPrenda, adelantoPct:+p.adelantoPct, validezDias:+p.validezDias, aplicarIGV:p.aplicarIGV, igv:+p.igv, descuentos:desc});
+  Object.assign(db.config, e, {adelantoPct:+p.adelantoPct, aplicarIGV:p.aplicarIGV, igv:+p.igv});
   save(); toast('Configuración guardada'); route();
 }
 function exportar(){ const b=new Blob([JSON.stringify(db,null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='pazprints-respaldo-'+today()+'.json'; a.click(); }
 function importar(f){ if(!f) return; const r=new FileReader(); r.onload=()=>{ try{ const d=JSON.parse(r.result); if(!d.clientes||!d.pedidos) throw 0; if(!confirm('Esto reemplazará los datos actuales. ¿Continuar?')) return; db=d; load2(); save(); toast('Respaldo restaurado'); route(); }catch(e){ toast('Archivo inválido'); } }; r.readAsText(f); }
-function load2(){ db.config=Object.assign(defaultConfig(),db.config||{}); db.seq=db.seq||{cot:0,ped:0}; ['clientes','inventario','cotizaciones','pedidos','movimientos'].forEach(k=>db[k]=db[k]||[]); }
+function load2(){ db.config=Object.assign(defaultConfig(),db.config||{}); db.seq=db.seq||{cot:0,ped:0}; ['clientes','inventario','cotizaciones','pedidos','movimientos'].forEach(k=>db[k]=db[k]||[]); migrar(); }
 function borrarTodo(){ if(!confirm('¿Borrar TODOS los datos? Esta acción no se puede deshacer.')) return; localStorage.removeItem(KEY); load(); save(); toast('Datos borrados'); location.hash='inicio'; route(); }
 
 /* ============ Datos de ejemplo ============ */
@@ -678,15 +683,15 @@ function cargarDemo(){
     I({tipo:'insumo',nombre:'Emulsión fotosensible',categoria:'Emulsión',unidad:'L',stock:2,minimo:1,costo:85}),
     I({tipo:'insumo',nombre:'Marco aluminio malla 120',categoria:'Malla / marco',unidad:'und',stock:8,minimo:4,costo:60})];
   db.inventario.push(...inv);
-  const mkCot=(cli,items,estado,dias)=>{ db.seq.cot++; const q={id:uid(),numero:'COT-'+String(db.seq.cot).padStart(4,'0'),fecha:addDays(today(),-dias),fechaEntrega:addDays(today(),5-dias),clienteId:cli.id,items,estado,notas:''}; q.total=calcDoc(items).total; db.cotizaciones.push(q); return q; };
-  const mkPed=(q,estado,entrega,pagos)=>{ db.seq.ped++; const p={id:uid(),numero:'PED-'+String(db.seq.ped).padStart(4,'0'),cotizacionId:q.id,clienteId:q.clienteId,fecha:q.fecha,fechaEntrega:addDays(today(),entrega),items:JSON.parse(JSON.stringify(q.items)),total:q.total,estado,notas:'',stockDescontado:['estampado','listo','entregado'].includes(estado),historial:[{fecha:q.fecha,estado:'pendiente'}]};
+  const mkCot=(cli,items,estado,dias)=>{ db.seq.cot++; const q={id:uid(),numero:'COT-'+String(db.seq.cot).padStart(4,'0'),fecha:addDays(today(),-dias),fechaInicio:addDays(today(),-dias),fechaEntrega:addDays(today(),5-dias),clienteId:cli.id,items,estado,notas:''}; q.total=calcDoc(items).total; db.cotizaciones.push(q); return q; };
+  const mkPed=(q,estado,entrega,pagos)=>{ db.seq.ped++; const p={id:uid(),numero:'PED-'+String(db.seq.ped).padStart(4,'0'),cotizacionId:q.id,clienteId:q.clienteId,fecha:q.fecha,fechaInicio:q.fechaInicio,fechaEntrega:addDays(today(),entrega),items:JSON.parse(JSON.stringify(q.items)),total:q.total,estado,notas:'',stockDescontado:['estampado','listo','entregado'].includes(estado),historial:[{fecha:q.fecha,estado:'pendiente'}]};
     if(estado!=='pendiente') p.historial.push({fecha:today(),estado}); db.pedidos.push(p); q.pedidoId=p.id; q.estado='aprobada';
     pagos.forEach(([m,met])=>db.movimientos.push({id:uid(),tipo:'ingreso',pedidoId:p.id,fecha:addDays(today(),-1),monto:m,metodo:met,concepto:'Pago '+p.numero,categoria:'Venta'})); return p; };
-  const it=(p,cant,col,ub)=>({descripcion:nombreInv(p),prendaId:p.id,cantidad:cant,colores:col,ubicaciones:ub,precioPrenda:p.precioVenta,precioManual:''});
-  const q1=mkCot(cl[0],[it(inv[0],100,2,1)],'aprobada',6); const p1=mkPed(q1,'estampado',2,[[q1.total/2,'Transferencia']]);
-  const q2=mkCot(cl[1],[it(inv[1],30,1,2),it(inv[2],10,1,1)],'aprobada',4); mkPed(q2,'diseno',-1,[[200,'Yape']]);
-  const q3=mkCot(cl[2],[{descripcion:'Polos de la clienta (ella trae la prenda)',prendaId:'',cantidad:24,colores:3,ubicaciones:1,precioPrenda:0,precioManual:''}],'aprobada',8); mkPed(q3,'listo',0,[[q3.total,'Plin']]);
-  mkCot(cl[0],[it(inv[2],50,1,2)],'enviada',1);
+  const it=(p,cant,precio,desc)=>({descripcion:desc,prendaId:p.id,cantidad:cant,precio});
+  const q1=mkCot(cl[0],[it(inv[0],100,18,'Polo blanco promoción, logo 2 colores en el pecho')],'aprobada',6); const p1=mkPed(q1,'estampado',2,[[q1.total/2,'Transferencia']]);
+  const q2=mkCot(cl[1],[it(inv[1],30,22,'Polo negro, logo adelante y atrás'),it(inv[2],10,48,'Polera gris con logo en el pecho')],'aprobada',4); mkPed(q2,'diseno',-1,[[200,'Yape']]);
+  const q3=mkCot(cl[2],[{descripcion:'Estampado 3 colores en polos de la clienta (ella trae la prenda)',prendaId:'',cantidad:24,precio:9}],'aprobada',8); mkPed(q3,'listo',0,[[q3.total,'Plin']]);
+  mkCot(cl[0],[it(inv[2],50,45,'Polera promoción con nombre en la espalda')],'enviada',1);
   if(p1.stockDescontado) inv[0].stock -= 100;
   db.movimientos.push({id:uid(),tipo:'egreso',fecha:today(),monto:180,metodo:'Efectivo',concepto:'Compra tintas plastisol',categoria:'Insumos / prendas'},
                       {id:uid(),tipo:'egreso',fecha:today(),monto:1200,metodo:'Transferencia',concepto:'Alquiler del taller',categoria:'Alquiler'});

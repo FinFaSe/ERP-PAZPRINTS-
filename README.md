@@ -15,29 +15,22 @@ En la pantalla de inicio está el botón **"Cargar datos de ejemplo"** para ver 
 | Módulo | Qué hace |
 |---|---|
 | Inicio | Indicadores: pedidos en curso, atrasados, ingresos y gastos del mes, deudas y stock bajo |
-| Clientes | Registro con DNI/RUC, teléfono y deuda de cada cliente |
-| Cotizaciones | Cotizador de serigrafía en 3 pasos (cliente y fechas → prendas → total). Cliente nuevo desde la misma pantalla, envío por WhatsApp, impresión o PDF y opción de eliminar |
+| Clientes | Registro con DNI/RUC, teléfono y deuda de cada cliente. Se pueden eliminar; sus cotizaciones y pedidos se conservan con su nombre |
+| Cotizaciones | Cotización simple en 3 pasos: cliente y fechas (inicio y entrega) → servicios (descripción, cantidad y precio por unidad con todo incluido) → total. Cliente nuevo desde la misma pantalla, envío por WhatsApp, impresión o PDF y opción de eliminar |
 | Pedidos | Tablero por estados: Pendiente → Diseño → Pantallas → Estampado → Listo → Entregado. Se pueden eliminar, con opción de devolver las prendas al inventario y borrar los pagos |
 | Inventario | Prendas (color/talla) e insumos (tintas, emulsión, mallas), con alertas de stock mínimo |
 | Caja y pagos | Adelantos y saldos (Efectivo, Yape, Plin, transferencia o tarjeta), gastos y resultado del mes |
-| Configuración | Datos de la empresa, precios, respaldo y restauración en JSON |
-
-### Fórmula de precio (editable en Configuración)
-
-- **Precio unitario** = precio de la prenda + colores × ubicaciones × costo por color (S/ 1.50 por defecto)
-- **Pantallas** = colores × ubicaciones × costo por pantalla (S/ 35 por defecto), se cobra una vez por pedido
-- **Descuento por volumen:** 50+ prendas 5 %, 100+ 10 %, 300+ 15 %
-- Cada línea acepta un **precio manual** que reemplaza el cálculo.
+| Configuración | Datos de la empresa, adelanto e IGV, respaldo y restauración en JSON |
 
 ### Mensajes de WhatsApp
 
-- **Cotización:** el botón *Guardar y enviar por WhatsApp* (o 📲 en la lista) arma el mensaje con el detalle, el total, el adelanto, la fecha de entrega y la validez. El mensaje se puede editar antes de enviarlo. Al enviarlo, la cotización pasa a *Enviada*.
+- **Cotización:** el botón *Guardar y enviar por WhatsApp* (o 📲 en la lista) arma el mensaje con cada servicio, el total, el adelanto y las fechas de inicio y entrega. El mensaje se puede editar antes de enviarlo. Al enviarlo, la cotización pasa a *Enviada*.
 - **Pedido listo:** al mover un pedido a *Listo* se abre el aviso para el cliente, con el saldo pendiente y dónde recogerlo. También se puede enviar desde el tablero o desde el detalle del pedido, y queda registrado que se avisó.
 - Se usa el enlace `wa.me`. Los números peruanos de 9 dígitos reciben automáticamente el prefijo 51.
 
 ### Reglas automáticas
 
-- Al aprobar una cotización (*El cliente aceptó: crear pedido*) se crea el pedido con la fecha de entrega elegida en la cotización.
+- Al aprobar una cotización (*El cliente aceptó: crear pedido*) se crea el pedido con las fechas de inicio y entrega elegidas en la cotización.
 - Al pasar un pedido a **Estampado** se descuentan las prendas del inventario.
 - Al registrar una compra de insumos con costo, se crea el gasto en caja y se actualiza el costo unitario.
 
