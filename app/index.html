@@ -208,7 +208,6 @@ function inicio(){
   const proximos = [...activos].sort((a,b)=>(a.fechaEntrega||'9').localeCompare(b.fechaEntrega||'9')).slice(0,6);
   $('#view').innerHTML = `
   <h1>Hola 👋 · ${esc(db.config.empresa)}</h1>
-  ${!db.clientes.length && !db.pedidos.length ? `<div class="card"><h2>¿Primera vez?</h2><p class="muted">El sistema está vacío. Puedes cargar datos de ejemplo para ver cómo funciona, y borrarlos después desde Configuración.</p><button class="primary" onclick="cargarDemo()">Cargar datos de ejemplo</button></div>`:''}
   <div class="grid kpis">
     <div class="card kpi"><div class="l">Pedidos en curso</div><div class="v">${activos.length}</div></div>
     <div class="card kpi"><div class="l">Atrasados</div><div class="v" style="color:${atrasados.length?'var(--bad)':'inherit'}">${atrasados.length}</div></div>
@@ -717,7 +716,7 @@ function config(){
     <div style="margin-top:12px"><button class="primary" onclick="guardarConfig()">Guardar configuración</button></div></div>
   <div class="card"><h2>Respaldo de datos</h2><p class="muted">Los datos se guardan en este navegador. Descarga un respaldo cada cierto tiempo, o úsalo para pasar la información a otra computadora.</p>
     <div class="bar"><button onclick="exportar()">⬇ Descargar respaldo (JSON)</button><label class="btn" style="margin:0;color:var(--text);font-size:14px">⬆ Restaurar respaldo<input type="file" accept=".json" style="display:none" onchange="importar(this.files[0])"></label>
-    <button onclick="cargarDemo()">Cargar datos de ejemplo</button><button class="danger" onclick="borrarTodo()">Borrar todos los datos</button></div></div>`;
+    <button class="danger" onclick="borrarTodo()">Borrar todos los datos</button></div></div>`;
 }
 function guardarConfig(){
   const e=formData('#fe'), p=formData('#fpr');
@@ -728,38 +727,6 @@ function exportar(){ const b=new Blob([JSON.stringify(db,null,2)],{type:'applica
 function importar(f){ if(!f) return; const r=new FileReader(); r.onload=()=>{ try{ const d=JSON.parse(r.result); if(!d.clientes||!d.pedidos) throw 0; if(!confirm('Esto reemplazará los datos actuales. ¿Continuar?')) return; db=d; load2(); save(); toast('Respaldo restaurado'); route(); }catch(e){ toast('Archivo inválido'); } }; r.readAsText(f); }
 function load2(){ db.config=Object.assign(defaultConfig(),db.config||{}); db.seq=db.seq||{cot:0,ped:0}; ['clientes','inventario','cotizaciones','pedidos','movimientos'].forEach(k=>db[k]=db[k]||[]); migrar(); }
 function borrarTodo(){ if(!confirm('¿Borrar TODOS los datos? Esta acción no se puede deshacer.')) return; localStorage.removeItem(KEY); load(); save(); toast('Datos borrados'); location.hash='inicio'; route(); }
-
-/* ============ Datos de ejemplo ============ */
-function cargarDemo(){
-  if((db.clientes.length||db.pedidos.length) && !confirm('Se agregarán datos de ejemplo a los existentes. ¿Continuar?')) return;
-  const C = n=>({id:uid(),...n,creado:today()});
-  const cl=[C({nombre:'Colegio San Martín',doc:'20481234567',telefono:'987 654 321',email:'compras@sanmartin.edu.pe',direccion:'Av. Los Olivos 123',notas:'Polos de promoción cada año'}),
-            C({nombre:'Gimnasio FitZone',doc:'20567891234',telefono:'912 345 678',email:'',direccion:'',notas:''}),
-            C({nombre:'María Quispe',doc:'45678912',telefono:'955 111 222',email:'',direccion:'',notas:'Emprendedora, ropa urbana'})];
-  db.clientes.push(...cl);
-  const I = n=>({id:uid(),...n});
-  const inv=[I({tipo:'prenda',nombre:'Polo algodón 20/1',color:'Blanco',talla:'M',unidad:'und',stock:120,minimo:30,costo:9,precioVenta:15}),
-    I({tipo:'prenda',nombre:'Polo algodón 20/1',color:'Negro',talla:'L',unidad:'und',stock:25,minimo:30,costo:10,precioVenta:16}),
-    I({tipo:'prenda',nombre:'Polera con capucha',color:'Gris',talla:'L',unidad:'und',stock:40,minimo:10,costo:28,precioVenta:42}),
-    I({tipo:'insumo',nombre:'Tinta plastisol blanca',categoria:'Tinta',unidad:'kg',stock:4,minimo:2,costo:45}),
-    I({tipo:'insumo',nombre:'Tinta base agua negra',categoria:'Tinta',unidad:'kg',stock:1,minimo:2,costo:38}),
-    I({tipo:'insumo',nombre:'Emulsión fotosensible',categoria:'Emulsión',unidad:'L',stock:2,minimo:1,costo:85}),
-    I({tipo:'insumo',nombre:'Marco aluminio malla 120',categoria:'Malla / marco',unidad:'und',stock:8,minimo:4,costo:60})];
-  db.inventario.push(...inv);
-  const mkCot=(cli,items,estado,dias)=>{ db.seq.cot++; const q={id:uid(),numero:'COT-'+String(db.seq.cot).padStart(4,'0'),fecha:addDays(today(),-dias),fechaInicio:addDays(today(),-dias),fechaEntrega:addDays(today(),5-dias),clienteId:cli.id,items,estado,notas:''}; q.total=calcDoc(items).total; db.cotizaciones.push(q); return q; };
-  const mkPed=(q,estado,entrega,pagos)=>{ db.seq.ped++; const p={id:uid(),numero:'PED-'+String(db.seq.ped).padStart(4,'0'),cotizacionId:q.id,clienteId:q.clienteId,fecha:q.fecha,fechaInicio:q.fechaInicio,fechaEntrega:addDays(today(),entrega),items:JSON.parse(JSON.stringify(q.items)),total:q.total,estado,notas:'',stockDescontado:['listo','entregado'].includes(estado),historial:[{fecha:q.fecha,estado:'pendiente'}]};
-    if(estado!=='pendiente') p.historial.push({fecha:today(),estado}); db.pedidos.push(p); q.pedidoId=p.id; q.estado='aprobada';
-    pagos.forEach(([m,met])=>db.movimientos.push({id:uid(),tipo:'ingreso',pedidoId:p.id,fecha:addDays(today(),-1),monto:m,metodo:met,concepto:'Pago '+p.numero,categoria:'Venta'})); return p; };
-  const it=(p,cant,precio,desc)=>({descripcion:desc,prendaId:p.id,cantidad:cant,precio});
-  const q1=mkCot(cl[0],[it(inv[0],100,18,'Polo blanco promoción, logo 2 colores en el pecho')],'aprobada',6); const p1=mkPed(q1,'pendiente',2,[[q1.total/2,'Transferencia']]);
-  const q2=mkCot(cl[1],[it(inv[1],30,22,'Polo negro, logo adelante y atrás'),it(inv[2],10,48,'Polera gris con logo en el pecho')],'aprobada',4); mkPed(q2,'pendiente',-1,[[200,'Yape']]);
-  const q3=mkCot(cl[2],[{descripcion:'Estampado 3 colores en polos de la clienta (ella trae la prenda)',prendaId:'',cantidad:24,precio:9}],'aprobada',8); mkPed(q3,'listo',0,[[q3.total,'Plin']]);
-  mkCot(cl[0],[it(inv[2],50,45,'Polera promoción con nombre en la espalda')],'enviada',1);
-  if(p1.stockDescontado) inv[0].stock -= 100;
-  db.movimientos.push({id:uid(),tipo:'egreso',fecha:today(),monto:180,metodo:'Efectivo',concepto:'Compra tintas plastisol',categoria:'Insumos / prendas'},
-                      {id:uid(),tipo:'egreso',fecha:today(),monto:1200,metodo:'Transferencia',concepto:'Alquiler del taller',categoria:'Alquiler'});
-  save(); toast('Datos de ejemplo cargados'); route();
-}
 
 load(); route();
 </script>

@@ -8,8 +8,6 @@ ERP para un taller de **serigrafía**. Es la versión inicial, hecha para mostra
 - **En línea:** el workflow `.github/workflows/pages.yml` publica la carpeta `app/` en GitHub Pages cada vez que hay cambios en `main`.
   - Hay que activarlo una vez: **Settings → Pages → Build and deployment → Source: GitHub Actions**.
 
-En la pantalla de inicio está el botón **"Cargar datos de ejemplo"** para ver el sistema con información de prueba.
-
 ## Módulos
 
 | Módulo | Qué hace |
