@@ -73,6 +73,14 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 .totals{margin-left:auto;max-width:320px}
 .totals div{display:flex;justify-content:space-between;padding:3px 0}
 .totals .t{font-weight:700;font-size:16px;border-top:1px solid var(--line);margin-top:4px;padding-top:6px}
+dialog.wide{max-width:1060px}
+button.wa{background:#25d366;border-color:#25d366;color:#fff}
+button.wa:hover{background:#1da851;border-color:#1da851}
+button.link{border:none;background:none;color:var(--brand);padding:4px 0;text-decoration:underline;cursor:pointer}
+.paso{display:flex;align-items:center;gap:8px;margin:20px 0 10px}
+.paso span{background:var(--brand);color:#fff;border-radius:50%;width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center;font-size:13px}
+.aviso{background:var(--chip);border-radius:8px;padding:10px 12px;font-size:13px}
+.aviso.ok{background:#2f9e4422}
 .toast{position:fixed;bottom:20px;right:20px;background:var(--text);color:var(--bg);padding:10px 16px;border-radius:8px;opacity:0;transition:.25s;pointer-events:none}
 .toast.show{opacity:1}
 .menu-btn{display:none}
@@ -92,7 +100,7 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 <body>
 <div class="layout">
   <nav class="side" id="side">
-    <div class="logo">PazPrints<small>ERP de serigrafía · prototipo v0.1</small></div>
+    <div class="logo">PazPrints<small>ERP de serigrafía</small></div>
     <a href="#inicio">🏠 Inicio</a>
     <a href="#clientes">👥 Clientes</a>
     <a href="#cotizaciones">📝 Cotizaciones</a>
@@ -169,7 +177,7 @@ function calcDoc(items){
 const pagado = pid => db.movimientos.filter(m=>m.pedidoId===pid && m.tipo==='ingreso').reduce((a,m)=>a+ +m.monto,0);
 
 /* ============ Diálogo genérico ============ */
-function openDlg(title, body, foot){ $('#dlgTitle').textContent=title; $('#dlgBody').innerHTML=body; $('#dlgFoot').innerHTML=foot||''; $('#dlg').showModal(); }
+function openDlg(title, body, foot){ $('#dlg').classList.remove('wide'); $('#dlgTitle').textContent=title; $('#dlgBody').innerHTML=body; $('#dlgFoot').innerHTML=foot||''; $('#dlg').showModal(); }
 function closeDlg(){ $('#dlg').close(); }
 function formData(sel){ const o={}; document.querySelectorAll(sel+' [name]').forEach(el=>{ o[el.name] = el.type==='checkbox'? el.checked : el.value; }); return o; }
 
@@ -246,82 +254,191 @@ function saveCliente(id){
 }
 function delCliente(id){ if(!confirm('¿Eliminar este cliente?')) return; db.clientes=db.clientes.filter(c=>c.id!==id); save(); closeDlg(); route(); }
 
+/* ============ WHATSAPP ============ */
+function telWA(t){ let d=String(t||'').replace(/\D/g,''); if(d.length===9 && d[0]==='9') d='51'+d; return d; }
+function whatsappDlg(titulo, telefono, texto, onSent, volver){
+  window._waSent = onSent; window._waBack = volver;
+  openDlg(titulo, `<div class="form" id="fw">
+    <div><label>Número de WhatsApp del cliente</label><input name="tel" value="${esc(telefono||'')}" placeholder="987 654 321"></div>
+    <div class="full"><label>Mensaje (puedes editarlo antes de enviar)</label><textarea name="txt" style="min-height:280px">${esc(texto)}</textarea></div></div>
+    <p class="muted" style="font-size:12px">Al presionar el botón se abre WhatsApp (app o web) con el mensaje ya escrito; solo tienes que darle a enviar.${telefono?'':' Si dejas el número vacío, WhatsApp te pedirá elegir el contacto.'}</p>`,
+    `<button onclick="${volver?'window._waBack()':'closeDlg()'}">${volver?'← Volver':'Ahora no'}</button><button class="wa" onclick="enviarWA()">📲 Abrir WhatsApp</button>`);
+}
+function enviarWA(){
+  const d=formData('#fw');
+  window.open(`https://wa.me/${telWA(d.tel)}?text=${encodeURIComponent(d.txt)}`,'_blank');
+  if(window._waSent) window._waSent();
+  closeDlg(); toast('Mensaje listo en WhatsApp'); route();
+}
+const plural = (n,s,p) => n==1 ? s : p;
+function msgCotizacion(q){
+  const c=cliente(q.clienteId), t=calcDoc(q.items), cf=db.config, L=[];
+  L.push(`Hola ${c.nombre} 👋, te saluda ${cf.empresa}.`);
+  L.push(`Te enviamos la cotización *${q.numero}*:`, '');
+  q.items.forEach(it=>{ const x=calcItem(it); L.push(`• ${it.cantidad} × ${it.descripcion} (${it.colores} ${plural(it.colores,'color','colores')}, ${it.ubicaciones} ${plural(it.ubicaciones,'ubicación','ubicaciones')}): ${money(x.total)}`); });
+  L.push('');
+  if(t.pct) L.push(`Descuento por volumen (${t.pct}%): −${money(t.desc)}`);
+  if(cf.aplicarIGV) L.push(`IGV (${cf.igv}%): ${money(t.igv)}`);
+  L.push(`*Total: ${money(t.total)}*`);
+  L.push(`Adelanto para empezar (${cf.adelantoPct}%): ${money(t.total*cf.adelantoPct/100)}`);
+  if(q.fechaEntrega) L.push(`Entrega estimada: ${fmtDate(q.fechaEntrega)}`);
+  L.push(`Cotización válida hasta: ${fmtDate(addDays(q.fecha,cf.validezDias))}`);
+  if(q.notas) L.push('', q.notas);
+  L.push('', '¿Te parece bien para empezar? Quedamos atentos 🙌');
+  return L.join('\n');
+}
+function msgListo(p){
+  const c=cliente(p.clienteId), cf=db.config, saldo=p.total-pagado(p.id), qty=p.items.reduce((a,i)=>a+ +i.cantidad,0), L=[];
+  L.push(`Hola ${c.nombre} 👋, te saluda ${cf.empresa}.`);
+  L.push(`¡Tu pedido *${p.numero}* (${qty} ${plural(qty,'prenda','prendas')}) ya está listo! 🎉`, '');
+  L.push(saldo>0.009 ? `Saldo pendiente: *${money(saldo)}*. Puedes pagar en efectivo, Yape, Plin o transferencia.` : 'Tu pedido ya está pagado ✅.');
+  L.push(cf.direccion ? `Puedes recogerlo en: ${cf.direccion}` : 'Avísanos qué día puedes recogerlo.');
+  L.push('', '¡Gracias por confiar en nosotros!');
+  return L.join('\n');
+}
+function waCotizacion(id){
+  const q=byId(db.cotizaciones,id);
+  whatsappDlg('Enviar cotización '+q.numero+' por WhatsApp', cliente(q.clienteId).telefono, msgCotizacion(q),
+    ()=>{ const s=byId(db.cotizaciones,id); if(s.estado==='borrador') s.estado='enviada'; s.enviadaEl=today(); save(); });
+}
+function avisarListo(id){
+  const p=byId(db.pedidos,id);
+  whatsappDlg('Avisar al cliente que el pedido '+p.numero+' está listo', cliente(p.clienteId).telefono, msgListo(p),
+    ()=>{ byId(db.pedidos,id).avisadoEl=today(); save(); }, ()=>verPedido(id));
+}
+
 /* ============ COTIZACIONES ============ */
-const estadoCot = {borrador:'',enviada:'info',aprobada:'ok',rechazada:'bad'};
+const ESTADO_COT = {borrador:['Borrador',''], enviada:['Enviada','info'], aprobada:['Aprobada','ok'], rechazada:['Rechazada','bad']};
+const chipCot = e => `<span class="chip ${ESTADO_COT[e][1]}">${ESTADO_COT[e][0]}</span>`;
 function cotizaciones(){
   const list = [...db.cotizaciones].reverse();
   $('#view').innerHTML = `<h1>Cotizaciones</h1>
-  <div class="bar"><span class="grow muted">Arma presupuestos y conviértelos en pedidos cuando el cliente apruebe.</span><button class="primary" onclick="nuevaCotizacion()">+ Nueva cotización</button></div>
-  <div class="card tablewrap">${list.length?`<table><tr><th>N°</th><th>Fecha</th><th>Cliente</th><th class="n">Prendas</th><th class="n">Total</th><th>Estado</th><th></th></tr>
-  ${list.map(q=>{ const t=calcDoc(q.items); return `<tr><td><b>${esc(q.numero)}</b></td><td>${fmtDate(q.fecha)}</td><td>${esc(cliente(q.clienteId).nombre)}</td><td class="n">${t.qty}</td><td class="n">${money(t.total)}</td><td><span class="chip ${estadoCot[q.estado]}">${q.estado}</span>${q.pedidoId?` <span class="chip ok">→ ${esc((byId(db.pedidos,q.pedidoId)||{}).numero||'')}</span>`:''}</td>
-  <td class="n"><button class="sm" onclick="editCotizacion('${q.id}')">Abrir</button> <button class="sm" onclick="imprimirCot('${q.id}')">Imprimir</button></td></tr>`}).join('')}</table>`:'<div class="empty">Aún no hay cotizaciones</div>'}</div>`;
+  <div class="bar"><span class="grow muted">Cómo funciona: <b>1.</b> Crea la cotización → <b>2.</b> Envíala por WhatsApp → <b>3.</b> Cuando el cliente acepte, apruébala y se crea el pedido.</span><button class="primary" onclick="nuevaCotizacion()">+ Nueva cotización</button></div>
+  <div class="card tablewrap">${list.length?`<table><tr><th>N°</th><th>Fecha</th><th>Cliente</th><th class="n">Prendas</th><th class="n">Total</th><th>Entrega</th><th>Estado</th><th></th></tr>
+  ${list.map(q=>{ const t=calcDoc(q.items); return `<tr><td><b>${esc(q.numero)}</b></td><td>${fmtDate(q.fecha)}</td><td>${esc(cliente(q.clienteId).nombre)}</td><td class="n">${t.qty}</td><td class="n">${money(t.total)}</td><td>${fmtDate(q.fechaEntrega)}</td>
+  <td>${chipCot(q.estado)}${q.pedidoId&&byId(db.pedidos,q.pedidoId)?` <span class="chip ok">→ ${esc(byId(db.pedidos,q.pedidoId).numero)}</span>`:''}</td>
+  <td class="n" style="white-space:nowrap"><button class="sm" onclick="editCotizacion('${q.id}')">Abrir</button> <button class="sm wa" title="Enviar por WhatsApp" onclick="waCotizacion('${q.id}')">📲</button> <button class="sm" title="Imprimir / PDF" onclick="imprimirCot('${q.id}')">🖨</button> <button class="sm danger" title="Eliminar" onclick="delCot('${q.id}')">🗑</button></td></tr>`}).join('')}</table>`:'<div class="empty">Aún no hay cotizaciones. Presiona <b>+ Nueva cotización</b> para empezar.</div>'}</div>`;
 }
 function nuevaCotizacion(clienteId){
-  if(!db.clientes.length){ toast('Primero registra un cliente'); location.hash='clientes'; return; }
-  window._cot = {id:null, numero:'', fecha:today(), clienteId: clienteId||db.clientes[0].id, items:[nuevoItem()], estado:'borrador', notas:''};
+  window._cot = {id:null, numero:'', fecha:today(), fechaEntrega:addDays(today(),5), clienteId: clienteId||(db.clientes[0]?db.clientes[0].id:''), items:[nuevoItem()], estado:'borrador', notas:'',
+                 _nuevo: !db.clientes.length, _nc:{nombre:'',telefono:''}};
   formCotizacion();
 }
 function nuevoItem(){ return {descripcion:'Polo algodón cuello redondo', prendaId:'', cantidad:12, colores:1, ubicaciones:1, precioPrenda:15, precioManual:''}; }
-function editCotizacion(id){ window._cot = JSON.parse(JSON.stringify(byId(db.cotizaciones,id))); formCotizacion(); }
-function formCotizacion(){
-  const q = window._cot, ro = !!q.pedidoId;
-  const prendas = db.inventario.filter(i=>i.tipo==='prenda');
-  const t = calcDoc(q.items);
-  openDlg(q.id? `Cotización ${q.numero}`:'Nueva cotización', `
-  <div class="form" id="fq">
-    <div><label>Cliente</label><select name="clienteId" ${ro?'disabled':''} onchange="window._cot.clienteId=this.value">${db.clientes.map(c=>`<option value="${c.id}" ${c.id===q.clienteId?'selected':''}>${esc(c.nombre)}</option>`).join('')}</select></div>
-    <div><label>Fecha</label><input type="date" value="${q.fecha}" ${ro?'disabled':''} onchange="window._cot.fecha=this.value"></div>
-    <div><label>Estado</label><select ${ro?'disabled':''} onchange="window._cot.estado=this.value">${Object.keys(estadoCot).map(e=>`<option ${e===q.estado?'selected':''}>${e}</option>`).join('')}</select></div>
-  </div>
-  <h2 style="margin-top:18px">Detalle</h2>
-  <div class="tablewrap"><table><tr><th style="min-width:200px">Descripción / prenda</th><th>Cant.</th><th>Colores</th><th>Ubicac.</th><th>Prenda S/</th><th>P. manual</th><th class="n">P. unit.</th><th class="n">Pantallas</th><th class="n">Total</th><th></th></tr>
-  ${q.items.map((it,i)=>{ const c=calcItem(it); return `<tr>
-    <td><select style="margin-bottom:4px" ${ro?'disabled':''} onchange="setPrenda(${i},this.value)"><option value="">— Prenda del cliente / sin inventario —</option>${prendas.map(p=>`<option value="${p.id}" ${p.id===it.prendaId?'selected':''}>${esc(nombreInv(p))} (stock ${p.stock})</option>`).join('')}</select>
-        <input value="${esc(it.descripcion)}" ${ro?'disabled':''} onchange="setIt(${i},'descripcion',this.value,false)"></td>
-    <td><input type="number" min="1" style="width:70px" value="${it.cantidad}" ${ro?'disabled':''} onchange="setIt(${i},'cantidad',this.value)"></td>
-    <td><input type="number" min="0" max="12" style="width:60px" value="${it.colores}" ${ro?'disabled':''} onchange="setIt(${i},'colores',this.value)"></td>
-    <td><input type="number" min="0" max="6" style="width:60px" value="${it.ubicaciones}" ${ro?'disabled':''} onchange="setIt(${i},'ubicaciones',this.value)"></td>
-    <td><input type="number" min="0" step="0.1" style="width:80px" value="${it.precioPrenda}" ${ro?'disabled':''} onchange="setIt(${i},'precioPrenda',this.value)"></td>
-    <td><input type="number" min="0" step="0.1" style="width:80px" placeholder="auto" value="${it.precioManual}" ${ro?'disabled':''} onchange="setIt(${i},'precioManual',this.value)"></td>
-    <td class="n">${money(c.precioUnit)}</td><td class="n">${c.pantallas} · ${money(c.setup)}</td><td class="n"><b>${money(c.total)}</b></td>
-    <td>${ro||q.items.length<2?'':`<button class="sm danger" onclick="window._cot.items.splice(${i},1);formCotizacion()">✕</button>`}</td></tr>`}).join('')}
-  </table></div>
-  ${ro?'':`<button class="sm" style="margin-top:8px" onclick="window._cot.items.push(nuevoItem());formCotizacion()">+ Agregar línea</button>`}
-  <p class="muted" style="font-size:12px">Precio unitario = prenda + (colores × ubicaciones × ${money(db.config.costoColorPrenda)}). Cada pantalla (color × ubicación) suma ${money(db.config.costoPantalla)} una sola vez. Si escribes un precio manual, reemplaza el cálculo y no se cobran pantallas aparte. Puedes cambiar estos valores en Configuración.</p>
-  <div class="totals">
-    <div><span>Subtotal (${t.qty} prendas)</span><span>${money(t.sub)}</span></div>
+function editCotizacion(id){ window._cot = Object.assign(JSON.parse(JSON.stringify(byId(db.cotizaciones,id))), {_nuevo:false, _nc:{nombre:'',telefono:''}}); formCotizacion(); }
+function totalsHTML(items){
+  const t = calcDoc(items);
+  return `<div><span>Subtotal (${t.qty} prendas)</span><span>${money(t.sub)}</span></div>
     ${t.pct?`<div><span>Descuento por volumen (${t.pct}%)</span><span>− ${money(t.desc)}</span></div>`:''}
     ${db.config.aplicarIGV?`<div><span>IGV (${db.config.igv}%)</span><span>${money(t.igv)}</span></div>`:''}
     <div class="t"><span>Total</span><span>${money(t.total)}</span></div>
+    <div class="muted"><span>Adelanto (${db.config.adelantoPct}%)</span><span>${money(t.total*db.config.adelantoPct/100)}</span></div>`;
+}
+function filaItem(it,i,ro,prendas,unica){
+  const c=calcItem(it), dis=ro?'disabled':'';
+  return `<tr>
+    <td><select style="margin-bottom:4px" ${dis} onchange="setPrenda(${i},this.value)"><option value="">Prenda que trae el cliente / sin inventario</option>${prendas.map(p=>`<option value="${p.id}" ${p.id===it.prendaId?'selected':''}>${esc(nombreInv(p))} (stock ${p.stock})</option>`).join('')}</select>
+        <input placeholder="Descripción" value="${esc(it.descripcion)}" ${dis} oninput="setIt(${i},'descripcion',this.value)"></td>
+    <td><input type="number" min="1" style="width:72px" value="${it.cantidad}" ${dis} oninput="setIt(${i},'cantidad',this.value)"></td>
+    <td><input type="number" min="0" max="12" style="width:62px" value="${it.colores}" ${dis} oninput="setIt(${i},'colores',this.value)"></td>
+    <td><input type="number" min="0" max="6" style="width:62px" value="${it.ubicaciones}" ${dis} oninput="setIt(${i},'ubicaciones',this.value)"></td>
+    <td><input type="number" min="0" step="0.1" style="width:82px" value="${it.precioPrenda}" ${dis} oninput="setIt(${i},'precioPrenda',this.value)"></td>
+    <td><input type="number" min="0" step="0.1" style="width:82px" placeholder="auto" value="${it.precioManual}" ${dis} oninput="setIt(${i},'precioManual',this.value)"></td>
+    <td class="n" id="ci-pu-${i}">${money(c.precioUnit)}</td><td class="n" id="ci-pa-${i}">${c.pantallas} · ${money(c.setup)}</td><td class="n" id="ci-tt-${i}"><b>${money(c.total)}</b></td>
+    <td>${ro||unica?'':`<button class="sm danger" title="Quitar" onclick="window._cot.items.splice(${i},1);formCotizacion()">✕</button>`}</td></tr>`;
+}
+function formCotizacion(){
+  const q = window._cot, ro = !!q.pedidoId, dis = ro?'disabled':'';
+  const prendas = db.inventario.filter(i=>i.tipo==='prenda');
+  const ped = ro && byId(db.pedidos,q.pedidoId);
+  openDlg(q.id? `Cotización ${q.numero}`:'Nueva cotización', `
+  ${ro ? `<div class="aviso ok">Esta cotización ya fue aprobada y es el pedido <b>${esc(ped?ped.numero:'')}</b>. Aquí solo puedes verla, reenviarla o imprimirla.</div>`
+       : `<div class="aviso">Llena los 3 pasos y al final elige: <b>guardar como borrador</b>, <b>enviarla por WhatsApp</b> o, si el cliente ya aceptó, <b>crear el pedido</b>. No hace falta volver a abrirla.</div>`}
+  <h2 class="paso"><span>1</span> Cliente y fechas</h2>
+  <div class="form">
+    <div class="full">${q._nuevo ? `
+      <div class="form"><div><label>Nombre del cliente nuevo *</label><input value="${esc(q._nc.nombre)}" oninput="window._cot._nc.nombre=this.value" placeholder="Ej.: Colegio San Martín"></div>
+      <div><label>WhatsApp</label><input value="${esc(q._nc.telefono)}" oninput="window._cot._nc.telefono=this.value" placeholder="987 654 321"></div></div>
+      ${db.clientes.length?`<button class="link" onclick="window._cot._nuevo=false;formCotizacion()">← Elegir un cliente ya registrado</button>`:''}`
+    : `<label>Cliente</label><select ${dis} onchange="window._cot.clienteId=this.value">${db.clientes.map(c=>`<option value="${c.id}" ${c.id===q.clienteId?'selected':''}>${esc(c.nombre)}${c.telefono?' · '+esc(c.telefono):''}</option>`).join('')}</select>
+      ${ro?'':`<button class="link" onclick="window._cot._nuevo=true;formCotizacion()">+ Es un cliente nuevo</button>`}`}</div>
+    <div><label>Fecha de la cotización</label><input type="date" value="${q.fecha}" ${dis} onchange="window._cot.fecha=this.value"></div>
+    <div><label>Fecha de entrega al cliente</label><input type="date" value="${q.fechaEntrega||''}" ${dis} onchange="window._cot.fechaEntrega=this.value"></div>
+    <div><label>Estado</label><div style="padding-top:6px">${chipCot(q.estado)} ${q.id&&!ro?`<button class="link" onclick="toggleRechazo()">${q.estado==='rechazada'?'Reabrir':'Marcar como rechazada'}</button>`:''}</div></div>
   </div>
-  <label style="margin-top:10px">Notas para el cliente</label><textarea ${ro?'disabled':''} onchange="window._cot.notas=this.value">${esc(q.notas)}</textarea>
-  ${ro?`<p class="chip ok" style="margin-top:10px">Convertida en pedido ${esc(byId(db.pedidos,q.pedidoId)?.numero||'')}</p>`:''}`,
-  ro? `<button onclick="closeDlg()">Cerrar</button>` :
-  `${q.id?`<button class="danger" onclick="delCot('${q.id}')">Eliminar</button>`:''}<button onclick="closeDlg()">Cancelar</button><button onclick="saveCot()">Guardar</button>${q.id?`<button class="primary" onclick="aPedido()">✔ Aprobar y crear pedido</button>`:''}`);
+  <h2 class="paso"><span>2</span> Prendas y estampado</h2>
+  <div class="tablewrap"><table><tr><th style="min-width:210px">Prenda / descripción</th><th>Cantidad</th><th>N° colores</th><th>Ubicaciones</th><th>Precio prenda S/</th><th>Precio manual</th><th class="n">P. unit.</th><th class="n">Pantallas</th><th class="n">Total</th><th></th></tr>
+  ${q.items.map((it,i)=>filaItem(it,i,ro,prendas,q.items.length<2)).join('')}</table></div>
+  ${ro?'':`<button class="sm" style="margin-top:8px" onclick="window._cot.items.push(nuevoItem());formCotizacion()">+ Agregar otra prenda</button>`}
+  <p class="muted" style="font-size:12px"><b>Ubicaciones</b> = lugares estampados (pecho, espalda, manga…). Precio unitario = prenda + (colores × ubicaciones × ${money(db.config.costoColorPrenda)}). Cada pantalla (color × ubicación) suma ${money(db.config.costoPantalla)} una sola vez. Si pones un <b>precio manual</b>, reemplaza el cálculo y no se cobran pantallas aparte.</p>
+  <h2 class="paso"><span>3</span> Total y notas</h2>
+  <div class="totals" id="cotTotals">${totalsHTML(q.items)}</div>
+  <label style="margin-top:10px">Notas para el cliente (aparecen en el mensaje y en la impresión)</label><textarea ${dis} oninput="window._cot.notas=this.value" placeholder="Ej.: Tinta plastisol, diseño enviado por el cliente">${esc(q.notas)}</textarea>`,
+  ro ? `<button class="danger" style="margin-right:auto" onclick="delCot('${q.id}')">🗑 Eliminar</button><button onclick="closeDlg()">Cerrar</button><button onclick="imprimirCot('${q.id}')">🖨 Imprimir</button><button class="wa" onclick="waCotizacion('${q.id}')">📲 Reenviar por WhatsApp</button>`
+     : `${q.id?`<button class="danger" style="margin-right:auto" onclick="delCot('${q.id}')">🗑 Eliminar</button>`:''}<button onclick="closeDlg()">Cancelar</button><button onclick="saveCot()">💾 Guardar borrador</button><button class="wa" onclick="if(saveCot(true)) waCotizacion(window._cot.id)">📲 Guardar y enviar por WhatsApp</button><button class="primary" onclick="aPedido()">✔ El cliente aceptó: crear pedido</button>`);
+  document.getElementById('dlg').classList.add('wide');
 }
-function setIt(i,k,v,rerender=true){ window._cot.items[i][k] = (k==='descripcion'||k==='precioManual')? v : +v; if(rerender) formCotizacion(); }
+function setIt(i,k,v){ window._cot.items[i][k] = (k==='descripcion'||k==='precioManual'||v==='') ? v : +v; refreshCot(); }
+function refreshCot(){
+  if(!$('#cotTotals')) return;
+  window._cot.items.forEach((it,i)=>{ const c=calcItem(it), s=(id,h)=>{ const e=document.getElementById(id); if(e) e.innerHTML=h; };
+    s('ci-pu-'+i, money(c.precioUnit)); s('ci-pa-'+i, `${c.pantallas} · ${money(c.setup)}`); s('ci-tt-'+i, `<b>${money(c.total)}</b>`); });
+  $('#cotTotals').innerHTML = totalsHTML(window._cot.items);
+}
 function setPrenda(i,pid){ const it=window._cot.items[i]; it.prendaId=pid; const p=byId(db.inventario,pid); if(p){ it.descripcion=nombreInv(p); if(p.precioVenta) it.precioPrenda=+p.precioVenta; } formCotizacion(); }
-function saveCot(silent){
+function validarCot(){
   const q = window._cot;
-  if(!q.id){ db.seq.cot++; q.id=uid(); q.numero='COT-'+String(db.seq.cot).padStart(4,'0'); db.cotizaciones.push(q); }
-  else { const i=db.cotizaciones.findIndex(x=>x.id===q.id); db.cotizaciones[i]=q; }
-  q.total = calcDoc(q.items).total;
-  save(); if(!silent){ closeDlg(); toast('Cotización guardada'); route(); }
+  if(q._nuevo){
+    if(!q._nc.nombre.trim()){ toast('Escribe el nombre del cliente (paso 1)'); return false; }
+    const c = {id:uid(), nombre:q._nc.nombre.trim(), doc:'', telefono:q._nc.telefono.trim(), email:'', direccion:'', notas:'', creado:today()};
+    db.clientes.push(c); q.clienteId=c.id; q._nuevo=false;
+  }
+  if(!byId(db.clientes,q.clienteId)){ toast('Elige un cliente (paso 1)'); return false; }
+  if(!q.items.length || q.items.some(it=>!(+it.cantidad>0))){ toast('Revisa las cantidades (paso 2)'); return false; }
+  if(q.items.some(it=>!String(it.descripcion).trim())){ toast('Falta la descripción de alguna prenda (paso 2)'); return false; }
+  return true;
 }
-function delCot(id){ if(!confirm('¿Eliminar cotización?')) return; db.cotizaciones=db.cotizaciones.filter(q=>q.id!==id); save(); closeDlg(); route(); }
+function saveCot(silent){
+  if(!validarCot()) return false;
+  const q = window._cot;
+  if(!q.id){ db.seq.cot++; q.id=uid(); q.numero='COT-'+String(db.seq.cot).padStart(4,'0'); }
+  const clean = JSON.parse(JSON.stringify(q)); delete clean._nuevo; delete clean._nc;
+  clean.total = calcDoc(clean.items).total;
+  const i = db.cotizaciones.findIndex(x=>x.id===q.id);
+  if(i>=0) db.cotizaciones[i]=clean; else db.cotizaciones.push(clean);
+  save();
+  if(!silent){ closeDlg(); toast(`Cotización ${q.numero} guardada`); route(); }
+  return true;
+}
+function toggleRechazo(){
+  const q = window._cot, s = byId(db.cotizaciones,q.id);
+  q.estado = s.estado = (s.estado==='rechazada' ? 'borrador' : 'rechazada');
+  save(); formCotizacion(); route();
+}
+function delCot(id){
+  const q = byId(db.cotizaciones,id); if(!q) return;
+  const p = q.pedidoId && byId(db.pedidos,q.pedidoId);
+  if(!confirm(`¿Eliminar la cotización ${q.numero}?` + (p?`\n\nEl pedido ${p.numero} que se creó con ella NO se elimina.`:''))) return;
+  if(p) p.cotizacionId = null;
+  db.cotizaciones = db.cotizaciones.filter(x=>x.id!==id);
+  save(); if($('#dlg').open) closeDlg(); toast('Cotización eliminada'); route();
+}
 function aPedido(){
-  const q = window._cot; q.estado='aprobada'; saveCot(true);
+  if(!saveCot(true)) return;
+  const q = byId(db.cotizaciones, window._cot.id); q.estado='aprobada';
   db.seq.ped++;
-  const p = {id:uid(), numero:'PED-'+String(db.seq.ped).padStart(4,'0'), cotizacionId:q.id, clienteId:q.clienteId, fecha:today(), fechaEntrega:addDays(today(),5),
-    items:JSON.parse(JSON.stringify(q.items)), total:calcDoc(q.items).total, estado:'pendiente', notas:q.notas||'', stockDescontado:false, historial:[{fecha:today(),estado:'pendiente'}]};
-  db.pedidos.push(p); q.pedidoId=p.id; save(); closeDlg(); toast('Pedido '+p.numero+' creado'); location.hash='pedidos'; setTimeout(()=>verPedido(p.id),50);
+  const p = {id:uid(), numero:'PED-'+String(db.seq.ped).padStart(4,'0'), cotizacionId:q.id, clienteId:q.clienteId, fecha:today(), fechaEntrega:q.fechaEntrega||addDays(today(),5),
+    items:JSON.parse(JSON.stringify(q.items)), total:q.total, estado:'pendiente', notas:q.notas||'', stockDescontado:false, historial:[{fecha:today(),estado:'pendiente'}]};
+  db.pedidos.push(p); q.pedidoId=p.id; save(); closeDlg();
+  toast('Pedido '+p.numero+' creado. Si ya pagó el adelanto, regístralo.');
+  location.hash='pedidos'; setTimeout(()=>verPedido(p.id),50);
 }
 function imprimirCot(id){
   const q=byId(db.cotizaciones,id), c=cliente(q.clienteId), t=calcDoc(q.items), cf=db.config;
   const w = window.open('','_blank'); if(!w) return toast('Permite ventanas emergentes para imprimir');
   w.document.write(`<html><head><title>${q.numero}</title><style>body{font-family:system-ui;padding:30px;color:#222}table{width:100%;border-collapse:collapse;margin:20px 0}th,td{border-bottom:1px solid #ddd;padding:8px;text-align:left}.n{text-align:right}h1{color:#d6336c;margin:0}</style></head><body>
   <h1>${esc(cf.empresa)}</h1><div>${esc(cf.ruc?'RUC '+cf.ruc:'')} ${esc(cf.telefono)} ${esc(cf.direccion)}</div><hr>
-  <h2>Cotización ${esc(q.numero)}</h2><p>Fecha: ${fmtDate(q.fecha)} · Válida hasta: ${fmtDate(addDays(q.fecha,cf.validezDias))}<br>Cliente: <b>${esc(c.nombre)}</b> ${esc(c.doc||'')}</p>
+  <h2>Cotización ${esc(q.numero)}</h2><p>Fecha: ${fmtDate(q.fecha)} · Válida hasta: ${fmtDate(addDays(q.fecha,cf.validezDias))}${q.fechaEntrega?' · Entrega: '+fmtDate(q.fechaEntrega):''}<br>Cliente: <b>${esc(c.nombre)}</b> ${esc(c.doc||'')}</p>
   <table><tr><th>Descripción</th><th class="n">Cant.</th><th>Estampado</th><th class="n">P. unit.</th><th class="n">Total</th></tr>
   ${q.items.map(it=>{const x=calcItem(it);return `<tr><td>${esc(it.descripcion)}</td><td class="n">${it.cantidad}</td><td>${it.colores} color(es) × ${it.ubicaciones} ubicación(es)</td><td class="n">${money(x.precioUnit)}</td><td class="n">${money(x.total)}</td></tr>`}).join('')}</table>
   <p class="n">Subtotal: ${money(t.sub)}<br>${t.pct?`Descuento ${t.pct}%: − ${money(t.desc)}<br>`:''}${cf.aplicarIGV?`IGV ${cf.igv}%: ${money(t.igv)}<br>`:''}<b style="font-size:18px">Total: ${money(t.total)}</b></p>
@@ -340,7 +457,8 @@ function pedidos(){
       return `<div class="tk" onclick="verPedido('${p.id}')"><b>${esc(p.numero)} · ${esc(cliente(p.clienteId).nombre)}</b>
       <div class="muted">${qty} prendas · ${money(p.total)}</div>
       <div class="${p.estado!=='entregado'&&p.fechaEntrega<hoy?'late':'muted'}">📅 ${fmtDate(p.fechaEntrega)}</div>
-      ${saldo>0.009?`<span class="chip warn">Saldo ${money(saldo)}</span>`:'<span class="chip ok">Pagado</span>'}</div>`}).join('')}</div>`}).join('')}</div>`;
+      ${saldo>0.009?`<span class="chip warn">Saldo ${money(saldo)}</span>`:'<span class="chip ok">Pagado</span>'}
+      ${p.estado==='listo'?(p.avisadoEl?`<div class="muted" style="font-size:12px;margin-top:4px">✅ Avisado ${fmtDate(p.avisadoEl)}</div>`:`<button class="sm wa" style="margin-top:6px" onclick="event.stopPropagation();avisarListo('${p.id}')">📲 Avisar al cliente</button>`):''}</div>`}).join('')}</div>`}).join('')}</div>`;
 }
 function verPedido(id){
   const p=byId(db.pedidos,id), c=cliente(p.clienteId), pag=pagado(id), saldo=p.total-pag;
@@ -356,6 +474,7 @@ function verPedido(id){
   <h2 style="margin-top:18px">Prendas</h2>
   <table><tr><th>Descripción</th><th class="n">Cant.</th><th>Estampado</th><th>Inventario</th></tr>
   ${p.items.map(it=>{ const inv=byId(db.inventario,it.prendaId); return `<tr><td>${esc(it.descripcion)}</td><td class="n">${it.cantidad}</td><td>${it.colores} col × ${it.ubicaciones} ubic.</td><td>${inv?`${esc(nombreInv(inv))} <span class="muted">(stock ${inv.stock})</span>`:'<span class="muted">Prenda del cliente</span>'}</td></tr>`}).join('')}</table>
+  ${['listo','entregado'].includes(p.estado)?`<p>${p.avisadoEl?`<span class="chip ok">Cliente avisado por WhatsApp el ${fmtDate(p.avisadoEl)}</span>`:'<span class="chip warn">Aún no se avisó al cliente</span>'}</p>`:''}
   <p>${p.stockDescontado?'<span class="chip ok">Stock de prendas descontado</span>':'<span class="chip">El stock se descuenta al pasar a "Estampado"</span>'}</p>
   <label>Notas de producción (tintas, Pantone, tallas, etc.)</label><textarea onchange="byId(db.pedidos,'${id}').notas=this.value;save()">${esc(p.notas)}</textarea>
   <h2 style="margin-top:18px">Pagos</h2>
@@ -364,6 +483,7 @@ function verPedido(id){
   <div class="muted">${(p.historial||[]).map(h=>`${fmtDate(h.fecha)}: ${(ESTADOS.find(e=>e.k===h.estado)||{}).l}`).join(' → ')}</div>`,
   `${idx>0?`<button onclick="moverPedido('${id}',-1)">← ${ESTADOS[idx-1].l}</button>`:''}
    ${saldo>0.009?`<button onclick="registrarPago('${id}')">💰 Registrar pago</button>`:''}
+   ${p.estado==='listo'?`<button class="wa" onclick="avisarListo('${id}')">📲 Avisar por WhatsApp</button>`:''}
    <button onclick="closeDlg()">Cerrar</button>
    ${idx<ESTADOS.length-1?`<button class="primary" onclick="moverPedido('${id}',1)">${ESTADOS[idx+1].l} →</button>`:''}`);
 }
@@ -378,7 +498,8 @@ function moverPedido(id,dir){
   }
   if(nuevo==='entregado' && p.total-pagado(id)>0.009 && !confirm('Este pedido tiene saldo pendiente de '+money(p.total-pagado(id))+'. ¿Marcar como entregado igual?')) return;
   p.estado=nuevo; (p.historial=p.historial||[]).push({fecha:today(),estado:nuevo});
-  save(); route(); verPedido(id);
+  save(); route();
+  if(nuevo==='listo' && dir>0) avisarListo(id); else verPedido(id);
 }
 function registrarPago(pid){
   const p=byId(db.pedidos,pid); const saldo=p.total-pagado(pid);
@@ -534,7 +655,7 @@ function cargarDemo(){
     I({tipo:'insumo',nombre:'Emulsión fotosensible',categoria:'Emulsión',unidad:'L',stock:2,minimo:1,costo:85}),
     I({tipo:'insumo',nombre:'Marco aluminio malla 120',categoria:'Malla / marco',unidad:'und',stock:8,minimo:4,costo:60})];
   db.inventario.push(...inv);
-  const mkCot=(cli,items,estado,dias)=>{ db.seq.cot++; const q={id:uid(),numero:'COT-'+String(db.seq.cot).padStart(4,'0'),fecha:addDays(today(),-dias),clienteId:cli.id,items,estado,notas:''}; q.total=calcDoc(items).total; db.cotizaciones.push(q); return q; };
+  const mkCot=(cli,items,estado,dias)=>{ db.seq.cot++; const q={id:uid(),numero:'COT-'+String(db.seq.cot).padStart(4,'0'),fecha:addDays(today(),-dias),fechaEntrega:addDays(today(),5-dias),clienteId:cli.id,items,estado,notas:''}; q.total=calcDoc(items).total; db.cotizaciones.push(q); return q; };
   const mkPed=(q,estado,entrega,pagos)=>{ db.seq.ped++; const p={id:uid(),numero:'PED-'+String(db.seq.ped).padStart(4,'0'),cotizacionId:q.id,clienteId:q.clienteId,fecha:q.fecha,fechaEntrega:addDays(today(),entrega),items:JSON.parse(JSON.stringify(q.items)),total:q.total,estado,notas:'',stockDescontado:['estampado','listo','entregado'].includes(estado),historial:[{fecha:q.fecha,estado:'pendiente'}]};
     if(estado!=='pendiente') p.historial.push({fecha:today(),estado}); db.pedidos.push(p); q.pedidoId=p.id; q.estado='aprobada';
     pagos.forEach(([m,met])=>db.movimientos.push({id:uid(),tipo:'ingreso',pedidoId:p.id,fecha:addDays(today(),-1),monto:m,metodo:met,concepto:'Pago '+p.numero,categoria:'Venta'})); return p; };

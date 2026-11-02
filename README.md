@@ -1,4 +1,4 @@
-# ERP PazPrints · Prototipo v0.1
+# ERP PazPrints · Prototipo v0.2
 
 ERP para un taller de **serigrafía**. Es la versión inicial, hecha para mostrar el flujo de trabajo y recibir comentarios.
 
@@ -16,7 +16,7 @@ En la pantalla de inicio está el botón **"Cargar datos de ejemplo"** para ver 
 |---|---|
 | Inicio | Indicadores: pedidos en curso, atrasados, ingresos y gastos del mes, deudas y stock bajo |
 | Clientes | Registro con DNI/RUC, teléfono y deuda de cada cliente |
-| Cotizaciones | Cotizador de serigrafía (prenda, colores, ubicaciones y pantallas), descuento por volumen, IGV opcional e impresión o PDF |
+| Cotizaciones | Cotizador de serigrafía en 3 pasos (cliente y fechas → prendas → total). Cliente nuevo desde la misma pantalla, envío por WhatsApp, impresión o PDF y opción de eliminar |
 | Pedidos / Producción | Tablero por estados: Pendiente → Diseño → Pantallas → Estampado → Listo → Entregado |
 | Inventario | Prendas (color/talla) e insumos (tintas, emulsión, mallas), con alertas de stock mínimo |
 | Caja y pagos | Adelantos y saldos (Efectivo, Yape, Plin, transferencia o tarjeta), gastos y resultado del mes |
@@ -29,9 +29,15 @@ En la pantalla de inicio está el botón **"Cargar datos de ejemplo"** para ver 
 - **Descuento por volumen:** 50+ prendas 5 %, 100+ 10 %, 300+ 15 %
 - Cada línea acepta un **precio manual** que reemplaza el cálculo.
 
+### Mensajes de WhatsApp
+
+- **Cotización:** el botón *Guardar y enviar por WhatsApp* (o 📲 en la lista) arma el mensaje con el detalle, el total, el adelanto, la fecha de entrega y la validez. El mensaje se puede editar antes de enviarlo. Al enviarlo, la cotización pasa a *Enviada*.
+- **Pedido listo:** al mover un pedido a *Listo* se abre el aviso para el cliente, con el saldo pendiente y dónde recogerlo. También se puede enviar desde el tablero o desde el detalle del pedido, y queda registrado que se avisó.
+- Se usa el enlace `wa.me`. Los números peruanos de 9 dígitos reciben automáticamente el prefijo 51.
+
 ### Reglas automáticas
 
-- Al aprobar una cotización se crea el pedido, con entrega a 5 días.
+- Al aprobar una cotización (*El cliente aceptó: crear pedido*) se crea el pedido con la fecha de entrega elegida en la cotización.
 - Al pasar un pedido a **Estampado** se descuentan las prendas del inventario.
 - Al registrar una compra de insumos con costo, se crea el gasto en caja y se actualiza el costo unitario.
 
