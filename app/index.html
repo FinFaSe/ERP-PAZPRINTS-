@@ -63,6 +63,7 @@ label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px}
 .col h3{font-size:12px;text-transform:uppercase;color:var(--muted);margin:4px 4px 8px;display:flex;justify-content:space-between}
 .tk{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px;margin-bottom:8px;cursor:pointer}
 .tk:hover{border-color:var(--brand)}
+.tk.nuevo{border-color:var(--brand);box-shadow:0 0 0 2px var(--brand)}
 .tk b{display:block}
 .late{color:var(--bad);font-weight:600}
 dialog{border:none;border-radius:14px;padding:0;max-width:880px;width:95vw;background:var(--panel);color:var(--text)}
@@ -458,7 +459,8 @@ function aPedido(){
   if(+q.adelanto>0) db.movimientos.push({id:uid(), tipo:'ingreso', pedidoId:p.id, fecha:today(), monto:+q.adelanto, metodo:q.metodoAdelanto||'Efectivo', concepto:'Adelanto '+p.numero, categoria:'Venta'});
   save(); closeDlg();
   toast('Pedido '+p.numero+' creado' + (+q.adelanto>0 ? ' con adelanto de '+money(q.adelanto) : ' sin adelanto'));
-  location.hash='pedidos'; setTimeout(()=>verPedido(p.id),50);
+  window._pedNuevo = p.id;   // se resalta en el tablero; el detalle se abre solo al hacer clic
+  if(location.hash==='#pedidos') route(); else location.hash='pedidos';
 }
 function imprimirCot(id){
   const q=byId(db.cotizaciones,id), c=cliente(q.clienteId), t=calcDoc(q.items), cf=db.config;
@@ -481,11 +483,12 @@ function pedidos(){
   <div class="kanban">${ESTADOS.map(e=>{ let ps=db.pedidos.filter(p=>p.estado===e.k); if(e.k==='entregado') ps=ps.slice(-8);
     return `<div class="col"><h3>${e.l}<span>${db.pedidos.filter(p=>p.estado===e.k).length}</span></h3>
     ${ps.map(p=>{ const saldo=p.total-pagado(p.id); const qty=p.items.reduce((a,i)=>a+ +i.cantidad,0);
-      return `<div class="tk" onclick="verPedido('${p.id}')"><b>${esc(p.numero)} · ${esc(cliente(p.clienteId).nombre)}</b>
+      return `<div class="tk${p.id===window._pedNuevo?' nuevo':''}" onclick="verPedido('${p.id}')"><b>${esc(p.numero)} · ${esc(cliente(p.clienteId).nombre)}</b>
       <div class="muted">${qty} prendas · ${money(p.total)}</div>
       <div class="${p.estado!=='entregado'&&p.fechaEntrega<hoy?'late':'muted'}">📅 ${fmtDate(p.fechaEntrega)}</div>
       ${saldo>0.009?`<span class="chip warn">Saldo ${money(saldo)}</span>`:'<span class="chip ok">Pagado</span>'}
       ${p.estado==='listo'?(p.avisadoEl?`<div class="muted" style="font-size:12px;margin-top:4px">✅ Avisado ${fmtDate(p.avisadoEl)}</div>`:`<button class="sm wa" style="margin-top:6px" onclick="event.stopPropagation();avisarListo('${p.id}')">📲 Avisar al cliente</button>`):''}</div>`}).join('')}</div>`}).join('')}</div>`;
+  window._pedNuevo = null;   // el resaltado solo dura hasta el siguiente cambio
 }
 function verPedido(id){
   const p=byId(db.pedidos,id), c=cliente(p.clienteId), pag=pagado(id), saldo=p.total-pag;
