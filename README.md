@@ -7,7 +7,7 @@ ERP para un taller de **serigrafía**. Es la versión inicial, hecha para mostra
 - **Local:** abre `app/index.html` en el navegador (Chrome, Edge o Firefox). No necesita instalación ni internet.
 - **En línea:** el workflow `.github/workflows/pages.yml` publica la carpeta `app/` en GitHub Pages cada vez que hay cambios en `main`.
   - Hay que activarlo una vez: **Settings → Pages → Build and deployment → Source: GitHub Actions**.
-- **Como app en el celular:** desde el link publicado, en Android usa *⋮ → Instalar app* y en iPhone (Safari) usa *Compartir → Agregar a inicio*. También está el botón *📲 Instalar app* en el menú y en Configuración. La app funciona sin internet (`app/sw.js`, `app/manifest.webmanifest`).
+- **Como app en el celular:** desde el link publicado, en Android usa *⋮ → Instalar app* y en iPhone (Safari) usa *Compartir → Agregar a inicio*. También está el botón *📲 Instalar app* en el menú. La app funciona sin internet (`app/sw.js`, `app/manifest.webmanifest`).
 
 ## Módulos
 
@@ -21,7 +21,7 @@ ERP para un taller de **serigrafía**. Es la versión inicial, hecha para mostra
 | Inventario | Prendas (color/talla) e insumos (tintas, emulsión, mallas), con alertas de stock mínimo |
 | Caja y pagos | Adelantos y saldos (Efectivo, Yape, Plin, transferencia o tarjeta), gastos y resultado del mes. Cada pago tiene su **recibo** (REC-0001…) para imprimir o enviar por WhatsApp |
 | Reportes | Ventas, cobrado, gastos, ganancia, ticket promedio y deudas por periodo; gráfico de los últimos 6 meses; mejores clientes, servicios más vendidos, gastos por categoría y cobros por método; exportación a Excel (CSV) |
-| Configuración | Datos de la empresa (con validación de RUC), IGV, instalación en el celular, estado de la facturación electrónica y respaldo y restauración en JSON |
+| Configuración | Datos de la empresa (con validación de RUC), IGV, respaldo y restauración en JSON |
 
 ### Mensajes de WhatsApp
 
@@ -42,4 +42,4 @@ ERP para un taller de **serigrafía**. Es la versión inicial, hecha para mostra
 
 - Los datos se guardan **en el navegador** (localStorage). Cada computadora tiene sus propios datos. Usa *Configuración → Descargar respaldo* para no perder información.
 - No hay usuarios ni contraseñas.
-- Los recibos son documentos internos, no comprobantes electrónicos. Para emitir boletas y facturas válidas ante SUNAT se necesitan RUC y Clave SOL, un proveedor autorizado (OSE/PSE), un certificado digital y un servidor que guarde las credenciales; el detalle está en Configuración.
+- Los recibos son documentos internos, no comprobantes electrónicos. Para emitir boletas y facturas válidas ante SUNAT se necesitan RUC y Clave SOL, un proveedor autorizado (OSE/PSE), un certificado digital y un servidor que guarde las credenciales.
