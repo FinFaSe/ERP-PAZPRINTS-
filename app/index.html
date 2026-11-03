@@ -869,7 +869,7 @@ function reportes(){
     <div class="card kpi"><div class="l">Ventas (${peds.length} ${plural(peds.length,'pedido','pedidos')})</div><div class="v">${money(ventas)}</div></div>
     <div class="card kpi"><div class="l">Cobrado</div><div class="v">${money(cobrado)}</div></div>
     <div class="card kpi"><div class="l">Gastos</div><div class="v">${money(gastos)}</div></div>
-    <div class="card kpi"><div class="l">Ganancia (cobrado − gastos)</div><div class="v" style="color:${cobrado-gastos<0?'var(--bad)':'inherit'}">${money(cobrado-gastos)}</div></div>
+    <div class="card kpi"><div class="l">Ganancia</div><div class="v" style="color:${cobrado-gastos<0?'var(--bad)':'inherit'}">${money(cobrado-gastos)}</div></div>
     <div class="card kpi"><div class="l">Ticket promedio</div><div class="v">${money(peds.length?ventas/peds.length:0)}</div></div>
     <div class="card kpi"><div class="l">Por cobrar (hoy)</div><div class="v">${money(porCobrar)}</div></div>
   </div>
