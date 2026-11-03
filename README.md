@@ -7,23 +7,28 @@ ERP para un taller de **serigrafía**. Es la versión inicial, hecha para mostra
 - **Local:** abre `app/index.html` en el navegador (Chrome, Edge o Firefox). No necesita instalación ni internet.
 - **En línea:** el workflow `.github/workflows/pages.yml` publica la carpeta `app/` en GitHub Pages cada vez que hay cambios en `main`.
   - Hay que activarlo una vez: **Settings → Pages → Build and deployment → Source: GitHub Actions**.
+- **Como app en el celular:** desde el link publicado, en Android usa *⋮ → Instalar app* y en iPhone (Safari) usa *Compartir → Agregar a inicio*. También está el botón *📲 Instalar app* en el menú y en Configuración. La app funciona sin internet (`app/sw.js`, `app/manifest.webmanifest`).
 
 ## Módulos
 
 | Módulo | Qué hace |
 |---|---|
 | Inicio | Indicadores: pedidos en curso, atrasados, ingresos y gastos del mes, deudas y stock bajo |
-| Clientes | Registro con DNI/RUC, teléfono y deuda de cada cliente. Se pueden eliminar; sus cotizaciones y pedidos se conservan con su nombre |
-| Cotizaciones | Cotización simple en 3 pasos: cliente y fechas (inicio y entrega) → servicios (descripción, cantidad y precio por unidad con todo incluido) → total y adelanto opcional que deja el cliente, con el saldo calculado. Cliente nuevo desde la misma pantalla, envío por WhatsApp, impresión o PDF y opción de eliminar |
+| Clientes | Registro con validación de DNI/RUC, teléfono y deuda. **Ficha del cliente** con lo comprado, pagado y adeudado, más sus pedidos, cotizaciones y pagos, y un recordatorio de cobro por WhatsApp. Se pueden eliminar; sus cotizaciones y pedidos se conservan con su nombre |
+| Cotizaciones | Cotización simple en 3 pasos: cliente y fechas (inicio y entrega) → servicios (descripción, cantidad y precio por unidad con todo incluido) → total y adelanto opcional que deja el cliente, con el saldo calculado. Cliente nuevo desde la misma pantalla, servicios elegidos desde la lista de precios, envío por WhatsApp, impresión o PDF y opción de eliminar |
+| Lista de precios | Servicios guardados con su precio por unidad (todo incluido) y la prenda del inventario opcional, para elegirlos al cotizar |
 | Pedidos | Tablero con 3 estados: Pendiente → Listo → Entregado. Al crear un pedido desde la cotización se muestra el tablero con el pedido nuevo en Pendiente. Se pueden editar (cliente, fechas y servicios) y eliminar, con opción de devolver las prendas al inventario y borrar los pagos |
 | Inventario | Prendas (color/talla) e insumos (tintas, emulsión, mallas), con alertas de stock mínimo |
-| Caja y pagos | Adelantos y saldos (Efectivo, Yape, Plin, transferencia o tarjeta), gastos y resultado del mes |
-| Configuración | Datos de la empresa, IGV, respaldo y restauración en JSON |
+| Caja y pagos | Adelantos y saldos (Efectivo, Yape, Plin, transferencia o tarjeta), gastos y resultado del mes. Cada pago tiene su **recibo** (REC-0001…) para imprimir o enviar por WhatsApp |
+| Reportes | Ventas, cobrado, gastos, ganancia, ticket promedio y deudas por periodo; gráfico de los últimos 6 meses; mejores clientes, servicios más vendidos, gastos por categoría y cobros por método; exportación a Excel (CSV) |
+| Configuración | Datos de la empresa (con validación de RUC), IGV, instalación en el celular, estado de la facturación electrónica y respaldo y restauración en JSON |
 
 ### Mensajes de WhatsApp
 
 - **Cotización:** el botón *Guardar y enviar por WhatsApp* (o 📲 en la lista) arma el mensaje con cada servicio, el total, el adelanto y saldo (si el cliente dejó adelanto) y las fechas de inicio y entrega. El mensaje se puede editar antes de enviarlo. Al enviarlo, la cotización pasa a *Enviada*.
 - **Pedido listo:** al mover un pedido a *Listo* se abre el aviso para el cliente, con el saldo pendiente y dónde recogerlo. También se puede enviar desde el tablero o desde el detalle del pedido, y queda registrado que se avisó.
+- **Recibo de pago:** al registrar un pago se ofrece imprimir el recibo o enviarlo por WhatsApp.
+- **Recordatorio de cobro:** desde la ficha del cliente, un pedido entregado con saldo o Caja → Saldos pendientes.
 - Se usa el enlace `wa.me`. Los números peruanos de 9 dígitos reciben automáticamente el prefijo 51.
 
 ### Reglas automáticas
@@ -36,4 +41,5 @@ ERP para un taller de **serigrafía**. Es la versión inicial, hecha para mostra
 ## Limitaciones del prototipo
 
 - Los datos se guardan **en el navegador** (localStorage). Cada computadora tiene sus propios datos. Usa *Configuración → Descargar respaldo* para no perder información.
-- No hay usuarios ni contraseñas, ni facturación electrónica SUNAT.
+- No hay usuarios ni contraseñas.
+- Los recibos son documentos internos, no comprobantes electrónicos. Para emitir boletas y facturas válidas ante SUNAT se necesitan RUC y Clave SOL, un proveedor autorizado (OSE/PSE), un certificado digital y un servidor que guarde las credenciales; el detalle está en Configuración.
