@@ -1026,18 +1026,6 @@ function config(){
   <div class="card"><h2>Impuestos</h2><div class="form" id="fpr">
     <div><label><input type="checkbox" name="aplicarIGV" style="width:auto" ${c.aplicarIGV?'checked':''}> Aplicar IGV (%)</label><input type="number" name="igv" value="${c.igv}"></div></div>
     <div style="margin-top:12px"><button class="primary" onclick="guardarConfig()">Guardar configuración</button></div></div>
-  <div class="card"><h2>Instalar en el celular</h2><p class="muted">Instala PazPrints como una app, con su ícono en la pantalla de inicio.</p>${pasosInstalar()}
-    <button class="primary" onclick="instalarApp()">📲 Instalar app</button></div>
-  <div class="card"><h2>Facturación electrónica (SUNAT) <span class="chip warn" style="vertical-align:middle">No conectada</span></h2>
-    <p>El sistema ya está preparado con lo básico: valida el DNI/RUC de tus clientes y el RUC de la empresa, y guarda los montos con o sin IGV. Los recibos que emite son <b>documentos internos</b>, no boletas ni facturas.</p>
-    <p>Para emitir boletas y facturas electrónicas válidas ante SUNAT se necesita:</p>
-    <ol style="padding-left:20px;line-height:1.7">
-      <li>RUC activo y <b>Clave SOL</b> de la empresa.</li>
-      <li>Contratar un <b>proveedor de facturación electrónica</b> autorizado por SUNAT (OSE/PSE), por ejemplo Nubefact, Facturador SUNAT u otro.</li>
-      <li>Un <b>certificado digital</b> (algunos proveedores lo incluyen).</li>
-      <li>Guardar los datos en la nube con un servidor propio, porque las credenciales del proveedor no pueden quedar dentro del navegador.</li>
-    </ol>
-    <p class="muted" style="font-size:12px">Cuando la empresa lo necesite, con esos datos se conecta el botón "Emitir boleta / factura" en cada pedido.</p></div>
   <div class="card"><h2>Respaldo de datos</h2><p class="muted">Los datos se guardan en este navegador. Descarga un respaldo cada cierto tiempo, o úsalo para pasar la información a otra computadora.</p>
     <div class="bar"><button onclick="exportar()">⬇ Descargar respaldo (JSON)</button><label class="btn" style="margin:0;color:var(--text);font-size:14px">⬆ Restaurar respaldo<input type="file" accept=".json" style="display:none" onchange="importar(this.files[0])"></label>
     <button class="danger" onclick="borrarTodo()">Borrar todos los datos</button></div></div>`;
